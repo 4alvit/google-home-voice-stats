@@ -13,12 +13,13 @@ cluster, or direct HTTPS protected by the read bearer alone. Do not relax a
 public Access policy to make this adapter work. Keep the target route free of
 redirects; HTTP on the private path does not encrypt the read token.
 
-The JSON response envelope contains:
+The following synthetic example illustrates the response envelope. Its timestamp
+and report text are placeholders, not measurements from an installation:
 
 ```json
 {
   "schema_version": 1,
-  "generated_at": 1789257600,
+  "generated_at": 1700000000,
   "mqtt_connected": true,
   "metrics": {
     "battery_soc": {},
@@ -26,11 +27,11 @@ The JSON response envelope contains:
     "solar_today": {}
   },
   "reports": {
-    "battery": {"text": "The battery is at 74 percent.", "status": "fresh"},
-    "solar": {"text": "Solar power is 1200 watts.", "status": "fresh"},
-    "solar_today": {"text": "Solar energy today is 6.2 kilowatt hours.", "status": "fresh"},
-    "status": {"text": "The battery is at 74 percent. Solar power is 1200 watts. No active alarms in the monitored sources.", "status": "fresh"},
-    "alarms": {"text": "No active alarms in the monitored sources.", "status": "fresh"}
+    "battery": {"text": "Example battery report.", "status": "fresh"},
+    "solar": {"text": "Example solar power report.", "status": "fresh"},
+    "solar_today": {"text": "Example solar energy report.", "status": "fresh"},
+    "status": {"text": "Example combined energy report.", "status": "fresh"},
+    "alarms": {"text": "Example monitored-alarm report.", "status": "fresh"}
   }
 }
 ```
@@ -41,8 +42,10 @@ interpreting individual alarm fields. Metric objects may contain
 values, units, source metadata, and timestamps; this adapter does not interpret
 them. The gateway is responsible for identifying unavailable sources and
 producing accurate reports. `generated_at` is the Unix timestamp in seconds of
-this API response, not the original measurement timestamp. Serve `application/json`
-and disable response caching at IGW and any reverse proxy.
+this API response, not the original measurement timestamp. A real response must
+use a current timestamp; the fixed example above is intentionally not a live
+response. Serve `application/json` and disable response caching at IGW and any
+reverse proxy.
 
 `schema_version` must be the integer 1, `mqtt_connected` a boolean, and
 `generated_at` a number within the configured envelope age window. The adapter
