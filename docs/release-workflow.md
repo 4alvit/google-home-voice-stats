@@ -17,6 +17,7 @@ python3 scripts/release.py status
 
 Callable validation workflows:
 - `.github/workflows/validate.yml`
+- `.github/workflows/test-adapter.yml`
 
 ## Nightly validation and deployment
 
@@ -29,7 +30,7 @@ copies; a green syntax/validate job is not a reviewed plan or a deployment.
 ## Project limits and rollout requirements
 
 - Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.
-- Syntax baseline only: YAML/JSON/Python/shell/JavaScript where present. No application tests, browser playback, cluster rendering or deployment checks implied.
+- The callable/local adapter tests cover response handling and rendered Home Assistant configuration; config validation uses the existing HA 2026.9.2 container with offline fixtures. Install .[test], Docker, PyYAML and actionlint for the complete local check. No physical Nest speech or live IGW verification is implied.
 
 For public repositories, merge and verify the workflows before enabling the
 additive Terraform **CI gate** ruleset. Where release/deployment workflows use

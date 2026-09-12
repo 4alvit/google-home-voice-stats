@@ -27,4 +27,4 @@ jobs:
         tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
         printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
     - name: Run local checks
-      run: bash scripts/ci.sh
+      run: bash scripts/ci.sh syntax

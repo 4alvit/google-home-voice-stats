@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "igw-google-voice"
+version = "0.1.0"
+description = "Read-only IGW energy reports for Google Nest through Home Assistant"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["Jinja2==3.1.6", "PyYAML==6.0.3"]
+
+[project.scripts]
+igw-google-voice = "igw_google_voice.__main__:main"
+
+[tool.setuptools]
+packages = ["igw_google_voice"]
+
+[tool.setuptools.data-files]
+"share/igw-google-voice/blueprints/script/igw" = ["blueprints/script/igw/announce_energy.yaml"]
