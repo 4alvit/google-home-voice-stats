@@ -185,7 +185,7 @@ class RendererTests(unittest.TestCase):
                 validate_url(url)
 
     def test_private_http_requires_explicit_opt_in(self):
-        for host in ("127.0.0.1", "localhost", "10.12.1.2", "172.16.2.3", "192.168.1.10", "[::1]", "[fd00::1]", "inverter-gateway.synology-apps.svc.cluster.local", "inverter-gateway.synology-apps.svc"):
+        for host in ("127.0.0.1", "localhost", "10.12.1.2", "172.16.2.3", "192.168.1.10", "[::1]", "[fd00::1]", "inverter-gateway.energy.svc.cluster.local", "inverter-gateway.energy.svc"):
             url = f"http://{host}:8080/v1/energy"
             with self.subTest(host=host):
                 with self.assertRaises(ValueError):
@@ -198,7 +198,7 @@ class RendererTests(unittest.TestCase):
                 validate_url(f"http://{host}/v1/energy", allow_local_http=True)
 
     def test_private_http_renderer_uses_only_scoped_bearer(self):
-        url = "http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy"
+        url = "http://inverter-gateway.energy.svc.cluster.local:8080/v1/energy"
         files = self.files(igw_url=url, allow_local_http=True)
         headers = load_yaml(files[Path("packages/igw_google_voice.yaml")])["rest_command"]["igw_energy_report"]["headers"]
         self.assertEqual(set(headers), {"Authorization", "Accept", "User-Agent", "Cache-Control"})
