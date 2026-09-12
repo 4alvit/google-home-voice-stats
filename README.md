@@ -167,4 +167,7 @@ CI runs both tests and the HA configuration check. Physical voice recognition,
 Google account linking, actual gateway access, and audible Nest playback require
 the installation smoke tests in [docs/testing.md](docs/testing.md).
 
+See [the deployment validation record](docs/deployment-validation.md) for the
+checks completed against an installed HA and IGW deployment.
+
 License: MIT.
