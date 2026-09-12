@@ -17,6 +17,13 @@ install.** Install the adapter in HA, then expose its scripts through your chose
 HA-to-Google account link. Google sees them as scenes. Ordinary device control
 remains available through that integration independently of this read-only adapter.
 
+<!-- ci-release-process:start -->
+## CI and deployment
+
+See [CI and deployment workflow](docs/release-workflow.md) for required checks and local commands. This repository uses validation-only policy; application release channels do not apply.
+<!-- ci-release-process:end -->
+
+
 ## Requirements
 
 - An IGW deployment serving authenticated `GET /v1/energy` over HTTPS with a valid
