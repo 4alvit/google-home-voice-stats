@@ -6,15 +6,16 @@ and speaks the gateway's text on a selected Nest speaker.
 
 The data path is **Victron/MQTT → IGW → read-only API**. IGW owns source
 selection, units, battery and solar statistics, freshness, and report wording.
-Home Assistant is an optional voice adapter: it does not collect or calculate
-those measurements. Google Assistant invokes one of five HA scripts as a scene;
-a shared queued script fetches and speaks the requested report.
+Home Assistant is required for this Google adapter and handles voice and report
+transport; it does not collect or calculate those measurements. IGW runs its data
+pipeline independently of HA. Google Assistant invokes one of five HA scripts
+as a scene; a shared queued script fetches and speaks the requested report.
 
 This repository contains an installable HA script blueprint, a configuration
-renderer, and tests. It does not contain a new Google cloud integration. Use the
-existing [HA Google Assistant integration](https://www.home-assistant.io/integrations/google_assistant/)
-or Home Assistant Cloud to link HA and Google. Ordinary device control remains
-available through that integration independently of this read-only adapter.
+renderer, and tests. **There is no standalone Google skill or store app to
+install.** Install the adapter in HA, then expose its scripts through your chosen
+HA-to-Google account link. Google sees them as scenes. Ordinary device control
+remains available through that integration independently of this read-only adapter.
 
 ## Requirements
 
@@ -27,9 +28,18 @@ available through that integration independently of this read-only adapter.
 - Home Assistant 2024.8 or newer, a working `tts.*` provider, and a Google Cast
   `media_player.*` entity. CI validates configuration against HA 2026.9.2; older
   supported syntax still needs verification on your installation.
-- A linked Google Home household. The recommended linking path is Home Assistant
-  Cloud. Manual Google account linking is also supported by HA.
+- A Google Home household and one HA-to-Google account link, as described below.
+  The adapter itself does not require a paid voice service; the chosen linking
+  provider may require a subscription.
 - Python 3.11+ for the renderer. Runtime Python dependencies: none.
+
+## Setup order
+
+1. Prepare IGW, a working HA TTS provider, and a Cast speaker.
+2. Render and install the adapter using the next two sections; test its scripts
+   from HA before configuring voice commands.
+3. [Link Google and expose the report scenes](#link-google-and-expose-the-report-scenes).
+4. [Try all five voice commands](#use-the-reports), then add optional short routines.
 
 ## Render a configuration
 
@@ -56,11 +66,12 @@ validates input syntax, writes a new staging directory, and refuses overwrites.
 It does not connect to HA or verify that entities exist.
 
 For HA and IGW in the same trusted Kubernetes cluster, use the internal service
-route and explicitly allow local HTTP:
+route and explicitly allow local HTTP. This example uses a generic service and
+namespace; substitute your own:
 
 ```bash
 python3 -m igw_google_voice render-config \
-  --igw-url http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy \
+  --igw-url http://inverter-gateway.energy.svc.cluster.local:8080/v1/energy \
   --allow-local-http \
   --tts-entity "$HA_TTS_ENTITY" \
   --media-player "$HA_NEST_ENTITY" \
@@ -120,11 +131,10 @@ The generated files are:
    runtime, using your actual config path. Then restart HA to load the REST
    command and blueprint scripts.
 6. In HA's Actions tool, call `script.igw_google_battery`,
-   `script.igw_google_solar`, `script.igw_google_solar_today`, and
-   `script.igw_google_status`, and `script.igw_announce_alarms`. Each should speak its own current report.
-7. Expose only these five wrapper scripts to Google Assistant, assign their room,
-   sync devices, and set up the voice phrases in [docs/routines.md](docs/routines.md).
-   Keep `script.igw_google_energy_dispatch` private.
+   `script.igw_google_solar`, `script.igw_google_solar_today`,
+   `script.igw_google_status`, and `script.igw_announce_alarms`. Each should speak
+   its own current report.
+7. Continue with Google linking and scene exposure below.
 
 The selected Nest is the output for every report, regardless of which speaker
 hears the request. This adapter does not identify the requesting speaker. Its
@@ -132,6 +142,105 @@ shared queue waits for playback with bounded timeouts to reduce interruptions;
 external music, other TTS automations, or a speaker that fails to report playback
 can still interfere. Cast must be able to fetch HA's generated audio URL; see
 [HA's Cast/TTS troubleshooting](https://www.home-assistant.io/integrations/tts/#google-cast-devices).
+
+## Link Google and expose the report scenes
+
+Choose **one** linking route for these scripts. Reuse an existing working link
+when available; linking the same scripts twice creates duplicate scene names.
+
+- **Home Assistant Cloud by Nabu Casa — optional paid service.** It requires a
+  subscription after its trial. In HA, set up Cloud, enable Google Assistant
+  under **Settings → Voice assistants**, and expose the report entities on the
+  **Expose** tab. In Google Home, open **Works with Google Home**, choose
+  **Home Assistant Cloud by Nabu Casa**, and sign in. Follow the
+  [official Cloud setup](https://support.nabucasa.com/hc/en-us/articles/25619376817053-Google-Assistant)
+  and [subscription information](https://www.home-assistant.io/integrations/google_assistant/#automatic-setup-via-home-assistant-cloud).
+- **Manual Home Assistant Google Assistant integration — no Home Assistant Cloud
+  subscription.** This requires an externally reachable HA HTTPS address and
+  your own Google Home Developer Console Cloud-to-cloud project with account
+  linking. An HTTPS address or Cloudflare Tunnel alone does not create that link.
+  Follow the
+  [complete official manual setup](https://www.home-assistant.io/integrations/google_assistant/#manual-setup-if-you-dont-have-home-assistant-cloud)
+  for account linking and YAML configuration. In Google Home's **Works with
+  Google Home** list, choose your **[test]** project and sign in to HA. Hosting
+  and domain costs, if any, are separate.
+- **An existing Homeway link.** Homeway currently lists Google Assistant access
+  as a [paid Supporter feature](https://homeway.io/assistant); its free remote
+  access does not imply free voice integration. If you already use it, follow
+  [Homeway's Google setup](https://help.homeway.io/help-docs/home-assistant/google-home-and-alexa/google-home-integration):
+  configure its HA add-on or [manual alternative](https://help.homeway.io/help-docs/home-assistant/google-home-and-alexa/manual-setup-guide),
+  open Google Home's **Works with Google** settings, select **Homeway**, and
+  sign in. Use Homeway's
+  Assistant Device Control to select the report scripts.
+
+Google Home menu labels vary by app version: **Works with Google Home** is
+available in the add-device flow or Home settings. Use the Google account and
+Home that contain the Nest you will speak to.
+
+Expose these five adapter entities, keeping their generated names:
+
+- `script.igw_google_battery` — **Battery report**.
+- `script.igw_google_solar` — **Solar power report**.
+- `script.igw_google_solar_today` — **Solar today report**.
+- `script.igw_google_status` — **Energy status report**.
+- `script.igw_announce_alarms` — **Energy alarms report**.
+
+Keep `script.igw_google_energy_dispatch` unexposed. Preserve existing exposure
+for other household devices. For manual YAML, merge these entities with
+`expose: true` and the dispatcher with `expose: false` into the existing
+`google_assistant.entity_config`; keep its account configuration and exposure
+policy. See [the merge example](docs/routines.md#manual-yaml-exposure).
+
+Assign the scripts to an HA area and the corresponding Google room, then say
+**"Hey Google, sync my devices."** Scripts appear to Google as scenes and may
+not have dashboard tiles. Room assignment matters for access by other household
+members; see [HA's room guidance](https://www.home-assistant.io/integrations/google_assistant/#roomarea-support).
+
+## Use the reports
+
+After linking, exposure, and sync, say these English commands:
+
+- **"Hey Google, activate Battery report."**
+- **"Hey Google, activate Solar power report."**
+- **"Hey Google, activate Solar today report."**
+- **"Hey Google, activate Energy status report."**
+- **"Hey Google, activate Energy alarms report."**
+
+Use the corresponding scene name if you renamed a script in Google. Each command
+fetches a current IGW report and plays it on the **fixed Nest selected when
+rendering the configuration**. Speaking to another Nest does not change the
+output speaker. The commands only read reports; they do not control the inverter.
+
+For shorter phrases, optionally create a Google Home automation/routine with a
+voice starter such as **"battery status"**, and an action activating **Battery
+report**. Repeat with **"solar power"**, **"solar today"**, **"energy status"**,
+and **"energy alarms"** for their matching scenes. Where a custom Assistant
+action is available, use the direct command you verified in your installation,
+such as **"activate Battery report"**. The short phrases work only after you create these routines; they are
+not registered automatically. See [routine details](docs/routines.md) and
+[Google's automation setup](https://support.google.com/googlehome/answer/16214649?hl=en).
+
+## Troubleshooting
+
+- **Google cannot find a report:** confirm the chosen account link, expose the
+  five scripts, check their scene names and room, and sync again. Test the direct
+  "activate … report" command before a custom routine. An absent dashboard tile
+  alone does not indicate failure.
+- **It works for one person only:** check Google Home membership and room
+  assignment. Manual Google projects also require the
+  [additional-user setup](https://www.home-assistant.io/integrations/google_assistant/#allow-other-users).
+- **Google responds but no report plays:** call the wrapper in HA's Actions tool,
+  then test `tts.speak` with the selected provider and speaker. Check that Cast
+  can retrieve HA's audio URL and that you are listening to the configured Nest.
+- **A connection-error sentence plays:** verify the IGW URL, scoped token, direct
+  HTTP 200 JSON response, and clock synchronization. A spoken stale/unavailable
+  warning instead comes from IGW; investigate the gateway's data sources.
+- **Google integration fails to load:** inspect its setup error and follow the
+  chosen provider's instructions. Manual linking requires its YAML configuration
+  as well as the Google project; importing this adapter does not create either.
+
+Use [the smoke tests](docs/testing.md) to distinguish API, speech, and Google
+account-link failures. Keep credentials and private diagnostics outside Git.
 
 ## Failure behavior
 
@@ -167,7 +276,8 @@ CI runs both tests and the HA configuration check. Physical voice recognition,
 Google account linking, actual gateway access, and audible Nest playback require
 the installation smoke tests in [docs/testing.md](docs/testing.md).
 
-See [the deployment validation record](docs/deployment-validation.md) for the
-checks completed against an installed HA and IGW deployment.
+See [the anonymized validation record](docs/deployment-validation.md) for the
+verified scope and the remaining physical voice/account-link checks. A successful
+Cast action alone does not establish human audibility or Google microphone access.
 
 License: MIT.
