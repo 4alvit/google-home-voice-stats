@@ -1,0 +1,27 @@
+name: Test Google voice adapter
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install test dependencies
+        run: python3 -m pip install '.[test]'
+      - name: Test response handling and rendered HA configuration
+        run: python3 -m unittest discover -s tests -v
+      - name: Render an offline HA validation fixture
+        run: python3 tests/make_ha_fixture.py ./rendered/ha-check
+      - name: Validate with Home Assistant 2026.9.2
+        run: |
+          docker run --rm --entrypoint python \
+            -v "$PWD/rendered/ha-check:/config" \
+            ghcr.io/home-assistant/home-assistant:2026.9.2 \
+            -m homeassistant --script check_config --config /config

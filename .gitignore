@@ -3,3 +3,10 @@
 __pycache__/
 .idea/
 .vscode/
+.venv/
+*.egg-info/
+build/
+dist/
+rendered/
+secrets.yaml
+*.secrets.yaml

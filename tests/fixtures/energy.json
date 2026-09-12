@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "generated_at": 1789257600,
+  "mqtt_connected": true,
+  "metrics": {
+    "battery_soc": {"value": 74, "unit": "%", "status": "fresh"},
+    "solar_power": {"value": 1200, "unit": "W", "status": "fresh"},
+    "solar_today": {"value": 6.2, "unit": "kWh", "status": "fresh"}
+  },
+  "reports": {
+    "battery": {"text": "The battery is at 74 percent.", "status": "fresh"},
+    "solar": {"text": "Solar power is 1200 watts.", "status": "fresh"},
+    "solar_today": {"text": "Solar energy today is 6.2 kilowatt hours.", "status": "fresh"},
+    "status": {"text": "The battery is at 74 percent. Solar power is 1200 watts. No active alarms in the monitored sources.", "status": "fresh"},
+    "alarms": {"text": "No active alarms in the monitored sources.", "status": "fresh"}
+  }
+}
