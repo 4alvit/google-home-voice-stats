@@ -4,6 +4,12 @@ Portable patterns so **Google Home / Nest / Google Assistant** can drive home **
 
 > Google is the microphone. HA owns devices and sensors. Keep Google Cloud projects, OAuth clients, and household entity ids out of this repo.
 
+<!-- ci-release-process:start -->
+## CI and deployment
+
+See [CI and deployment workflow](docs/release-workflow.md) for required checks and local commands. This repository uses validation-only policy; application release channels do not apply.
+<!-- ci-release-process:end -->
+
 ## Architecture
 
 1. **Hub**: Home Assistant (preferred), or Matter/Thread devices Google already supports
