@@ -23,15 +23,14 @@ configured in HA, and no battery, solar, or alarm calculations run in HA.
 - All six adapter script entities loaded in the `off` state. The Google Assistant
   integration, Google Cast, and the English Google Translate TTS provider loaded.
 
-At the last startup-state check, `/api/config` still reported `NOT_RUNNING`,
-despite the functional API and loaded adapter. Full-core `RUNNING` status was
-therefore not verified by these checks. The installation's existing default
-log level is `error`, suppressing normal bootstrap progress and integration-wait
-messages; bounded stdout and file-log scans did not identify a pending startup
-task. Unrelated integration errors appeared in the startup log, including Alexa
-Media device registry compatibility, SmartThings time-entity errors, and
-Prometheus callbacks. No conclusion about overall installation health follows
-from the adapter checks below.
+HA initially reported `NOT_RUNNING` while the API and adapter were already
+functional, then completed bootstrap and reported `RUNNING`. The installed HA
+source confirms that this API field reads the live core lifecycle state.
+Bootstrap/setup logging was temporarily raised to `info` for a bounded diagnostic
+window, then both loggers were restored to their original `error` level. No
+specific pending integration was identified. Other integrations logged Alexa
+Media device registry compatibility, SmartThings time-entity, and Prometheus
+callback errors during startup; they did not prevent the final `RUNNING` state.
 
 ## IGW request path
 
