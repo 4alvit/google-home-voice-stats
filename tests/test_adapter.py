@@ -159,15 +159,15 @@ class RendererTests(unittest.TestCase):
         return render_files(**options)
 
     def test_package_contract_and_authentication(self):
-        for use_cf in (False, True):
-            package = load_yaml(self.files(cloudflare_access=use_cf)[Path("packages/igw_google_voice.yaml")])
+        for use_local in (False, True):
+            package = load_yaml(self.files(allow_local_http=use_local)[Path("packages/igw_google_voice.yaml")])
             rest = package["rest_command"]["igw_energy_report"]
             self.assertEqual(rest["method"], "GET")
             self.assertTrue(rest["verify_ssl"])
             self.assertEqual(rest["url"], ("!secret", "igw_energy_url"))
             self.assertEqual(rest["headers"]["Authorization"], ("!secret", "igw_energy_authorization"))
             self.assertEqual(rest["headers"]["User-Agent"], "IGWEnergyVoice/1.0 (+https://github.com/victron-venus/inverter-gateway)")
-            self.assertEqual("CF-Access-Client-Secret" in rest["headers"], use_cf)
+            self.assertFalse(any(key.startswith("CF-Access") for key in rest["headers"]))
             self.assertEqual(package["logger"]["logs"]["homeassistant.components.rest_command"], "warning")
             self.assertNotIn("sensor", package)
             self.assertNotIn("template", package)
@@ -184,6 +184,26 @@ class RendererTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 validate_url(url)
 
+    def test_private_http_requires_explicit_opt_in(self):
+        for host in ("127.0.0.1", "localhost", "10.12.1.2", "172.16.2.3", "192.168.1.10", "[::1]", "[fd00::1]", "inverter-gateway.synology-apps.svc.cluster.local", "inverter-gateway.synology-apps.svc"):
+            url = f"http://{host}:8080/v1/energy"
+            with self.subTest(host=host):
+                with self.assertRaises(ValueError):
+                    validate_url(url)
+                self.assertEqual(validate_url(url, allow_local_http=True), url)
+
+    def test_private_http_opt_in_never_accepts_public_or_ambiguous_hosts(self):
+        for host in ("8.8.8.8", "172.32.0.1", "169.254.169.254", "[2001:4860:4860::8888]", "public.net", "igw.home.test", "localhost.public.net", "service.svc.cluster.local.public.net", "svc.cluster.local", "bad_name.namespace.svc.cluster.local"):
+            with self.subTest(host=host), self.assertRaises(ValueError):
+                validate_url(f"http://{host}/v1/energy", allow_local_http=True)
+
+    def test_private_http_renderer_uses_only_scoped_bearer(self):
+        url = "http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy"
+        files = self.files(igw_url=url, allow_local_http=True)
+        headers = load_yaml(files[Path("packages/igw_google_voice.yaml")])["rest_command"]["igw_energy_report"]["headers"]
+        self.assertEqual(set(headers), {"Authorization", "Accept", "User-Agent", "Cache-Control"})
+        self.assertNotIn("igw_cf", files[Path("igw.secrets.example.yaml")])
+
     def test_rejects_invalid_entities(self):
         for entity in ("media_player.YOUR_NEST", "media_player.your_nest", "media_player.example", "light.kitchen", "media_player.{{nest}}", "media_player.kitchen\nlogger:"):
             with self.subTest(entity=entity), self.assertRaises(ValueError):
@@ -192,7 +212,7 @@ class RendererTests(unittest.TestCase):
     def test_rejects_invalid_age(self):
         for age in (0, 4, 301, True):
             with self.assertRaises(ValueError):
-                render_package("tts.speech", "media_player.nest", False, age)
+                render_package("tts.speech", "media_player.nest", age)
 
     def test_writes_only_expected_files_and_protects_secret_example(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -218,7 +238,7 @@ class RendererTests(unittest.TestCase):
 
     def test_cli_smoke(self):
         with tempfile.TemporaryDirectory() as tmp:
-            result = main(["render-config", "--igw-url", "https://igw.home.test/v1/energy", "--tts-entity", "tts.speech", "--media-player", "media_player.nest", "--cloudflare-access", "--output", str(Path(tmp) / "staged")])
+            result = main(["render-config", "--igw-url", "https://igw.home.test/v1/energy", "--tts-entity", "tts.speech", "--media-player", "media_player.nest", "--output", str(Path(tmp) / "staged")])
             self.assertEqual(result, 0)
 
 

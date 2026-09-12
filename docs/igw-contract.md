@@ -1,9 +1,17 @@
 # IGW contract used by this adapter
 
-The request is an authenticated HTTPS `GET /v1/energy`, with `Accept:
-application/json`, no payload, a ten-second timeout, and TLS verification enabled.
-The bearer credential must be scoped to reading reports. Optional Cloudflare
-Access service-token headers authorize the same read path through Access.
+The request is an authenticated `GET /v1/energy`, with `Accept: application/json`,
+no payload, and a ten-second timeout. HTTPS uses certificate verification. Local
+HTTP requires the renderer's explicit `--allow-local-http` flag and a private IP,
+localhost, or Kubernetes service DNS name on a trusted network. The bearer
+credential must be scoped to reading reports.
+
+HA REST commands follow redirects and cannot disable that behavior. They forward
+custom Cloudflare Access headers across origins, so this adapter does not accept
+or render those headers. Use the private IGW service route for HA in the same
+cluster, or direct HTTPS protected by the read bearer alone. Do not relax a
+public Access policy to make this adapter work. Keep the target route free of
+redirects; HTTP on the private path does not encrypt the read token.
 
 The JSON response envelope contains:
 
@@ -21,8 +29,8 @@ The JSON response envelope contains:
     "battery": {"text": "The battery is at 74 percent.", "status": "fresh"},
     "solar": {"text": "Solar power is 1200 watts.", "status": "fresh"},
     "solar_today": {"text": "Solar energy today is 6.2 kilowatt hours.", "status": "fresh"},
-    "status": {"text": "The battery is at 74 percent. Solar power is 1200 watts. No active energy alarms.", "status": "fresh"},
-    "alarms": {"text": "No active energy alarms.", "status": "fresh"}
+    "status": {"text": "The battery is at 74 percent. Solar power is 1200 watts. No active alarms in the monitored sources.", "status": "fresh"},
+    "alarms": {"text": "No active alarms in the monitored sources.", "status": "fresh"}
   }
 }
 ```

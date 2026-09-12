@@ -4,7 +4,7 @@ Ask Google for battery charge, solar power, today's solar energy, an energy
 summary, or active alarms. Home Assistant fetches a current report from the Inverter Gateway (IGW)
 and speaks the gateway's text on a selected Nest speaker.
 
-The data path is **Victron/MQTT → IGW → read-only HTTPS API**. IGW owns source
+The data path is **Victron/MQTT → IGW → read-only API**. IGW owns source
 selection, units, battery and solar statistics, freshness, and report wording.
 Home Assistant is an optional voice adapter: it does not collect or calculate
 those measurements. Google Assistant invokes one of five HA scripts as a scene;
@@ -19,10 +19,11 @@ available through that integration independently of this read-only adapter.
 ## Requirements
 
 - An IGW deployment serving authenticated `GET /v1/energy` over HTTPS with a valid
-  certificate and the contract in [docs/igw-contract.md](docs/igw-contract.md).
-- A scoped IGW read bearer token. If Cloudflare Access protects the endpoint, also
-  supply an Access service token accepted by that application's service-auth policy.
-  Browser login alone is insufficient for HA's REST request.
+  certificate, or explicitly opted-in HTTP within a trusted private network, and
+  the contract in [docs/igw-contract.md](docs/igw-contract.md).
+- A scoped IGW read bearer token. The HA adapter supports bearer authentication
+  only. Do not put Cloudflare Access service-token headers in a REST command:
+  HA follows redirects and forwards those custom headers to another origin.
 - Home Assistant 2024.8 or newer, a working `tts.*` provider, and a Google Cast
   `media_player.*` entity. CI validates configuration against HA 2026.9.2; older
   supported syntax still needs verification on your installation.
@@ -45,16 +46,37 @@ python3 -m igw_google_voice render-config \
   --igw-url "$IGW_ENERGY_URL" \
   --tts-entity "$HA_TTS_ENTITY" \
   --media-player "$HA_NEST_ENTITY" \
-  --cloudflare-access \
   --output ./rendered
 ```
 
 Replace the example values before running: entity placeholders and incomplete,
-insecure, or credential-bearing URLs are rejected. Omit `--cloudflare-access` if
-IGW is not behind Access. Use `--max-response-age 60` only if you intentionally
+insecure, or credential-bearing URLs are rejected. Use `--max-response-age 60` only if you intentionally
 need a different envelope age limit; the default is 30 seconds. The renderer
 validates input syntax, writes a new staging directory, and refuses overwrites.
 It does not connect to HA or verify that entities exist.
+
+For HA and IGW in the same trusted Kubernetes cluster, use the internal service
+route and explicitly allow local HTTP:
+
+```bash
+python3 -m igw_google_voice render-config \
+  --igw-url http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy \
+  --allow-local-http \
+  --tts-entity "$HA_TTS_ENTITY" \
+  --media-player "$HA_NEST_ENTITY" \
+  --output ./rendered-local
+```
+
+The opt-in accepts only RFC1918 private IPs, loopback/localhost, IPv6 unique-local
+addresses, and Kubernetes service names ending in `.svc` or `.svc.cluster.local`.
+Public HTTP and arbitrary DNS hostnames remain rejected. This validates the URL
+shape, not network isolation: the operator must trust cluster DNS and routing.
+HTTP carries the scoped read token without transport encryption; use it only
+inside that trusted network, or use direct HTTPS bearer authentication instead.
+An Access-protected public endpoint requiring custom service-token headers is
+not supported by HA's REST command. Configure a direct private route for HA;
+do not weaken the public Access policy. The endpoint should serve a direct
+response without redirects.
 
 To install the CLI itself, use `python3 -m pip install .` in a virtual environment;
 then `igw-google-voice render-config` is available outside the checkout.
@@ -76,8 +98,8 @@ The generated files are:
    `igw_*` names; install only one copy per HA instance.
 2. Merge the generated secret keys into HA's existing `secrets.yaml`. Set
    `igw_energy_authorization` to `Bearer ` followed by the scoped read token.
-   Set both Cloudflare secret keys when enabled. Replace all credential
-   placeholders, keep the real file outside Git, and restrict it to its owner.
+   Replace all credential placeholders, keep the real file outside Git, and
+   restrict it to its owner.
    Do not copy the example secrets file into the package directory.
 3. Enable [HA packages](https://www.home-assistant.io/docs/configuration/packages/)
    in `configuration.yaml`, merging with your existing `homeassistant` section:
@@ -113,7 +135,7 @@ can still interfere. Cast must be able to fetch HA's generated audio URL; see
 
 ## Failure behavior
 
-Every queued request performs its own HTTPS GET when execution begins. There are
+Every queued request performs its own authenticated GET when execution begins. There are
 no cached HA energy sensors. The response must have HTTP 200, schema version 1,
 the expected envelope fields, a recent numeric Unix timestamp, and a recognized
 report status with nonempty text. The timestamp may be at most five seconds in

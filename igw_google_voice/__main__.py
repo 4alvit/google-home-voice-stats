@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 from pathlib import Path
 import re
@@ -35,16 +36,39 @@ def validate_entity(value: str, domain: str) -> str:
     return value
 
 
-def validate_url(value: str) -> str:
-    """Accept only a fixed HTTPS endpoint with no embedded secrets or template."""
+def local_http_host(hostname: str) -> bool:
+    """Permit explicit loopback, private IPs, and Kubernetes service DNS only."""
+    if hostname == "localhost":
+        return True
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        labels = hostname.split(".")
+        valid_labels = all(
+            re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?", label)
+            for label in labels
+        )
+        return valid_labels and (
+            hostname.endswith(".svc.cluster.local") and len(labels) >= 5
+            or hostname.endswith(".svc") and len(labels) >= 3
+        )
+    private_networks = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "::1/128", "fc00::/7")
+    return any(address in ipaddress.ip_network(network) for network in private_networks)
+
+
+def validate_url(value: str, allow_local_http: bool = False) -> str:
+    """Accept HTTPS, or explicitly opted-in private HTTP, without URL secrets."""
     try:
         parsed = urlsplit(value)
         parsed.port
         hostname = parsed.hostname or ""
     except ValueError as exc:
-        raise ValueError("Use a valid HTTPS IGW URL ending in /v1/energy.") from exc
+        raise ValueError("Use a valid IGW URL ending in /v1/energy.") from exc
+    safe_transport = parsed.scheme == "https" or (
+        parsed.scheme == "http" and allow_local_http and local_http_host(hostname)
+    )
     if (
-        parsed.scheme != "https"
+        not safe_transport
         or not hostname
         or parsed.username is not None
         or parsed.password is not None
@@ -56,7 +80,7 @@ def validate_url(value: str) -> str:
         or hostname.lower() in {"example.com", "example.net", "example.org"}
         or hostname.lower().endswith((".example.com", ".example.net", ".example.org", ".invalid"))
     ):
-        raise ValueError("Use your real HTTPS IGW URL ending in /v1/energy, without credentials or a query.")
+        raise ValueError("Use a real HTTPS IGW URL ending in /v1/energy, or explicitly allow private HTTP; omit URL credentials and queries.")
     return value
 
 
@@ -71,7 +95,7 @@ def blueprint_source() -> Path:
     raise ValueError("Blueprint asset is missing; use a complete checkout or reinstall the package.")
 
 
-def render_package(tts_entity: str, media_player: str, cloudflare_access: bool, max_age: int) -> str:
+def render_package(tts_entity: str, media_player: str, max_age: int) -> str:
     validate_entity(tts_entity, "tts")
     validate_entity(media_player, "media_player")
     if isinstance(max_age, bool) or not 5 <= max_age <= 300:
@@ -95,11 +119,6 @@ def render_package(tts_entity: str, media_player: str, cloudflare_access: bool, 
         '      User-Agent: "IGWEnergyVoice/1.0 (+https://github.com/victron-venus/inverter-gateway)"',
         '      Cache-Control: "no-cache, no-store"',
     ]
-    if cloudflare_access:
-        lines.extend([
-            "      CF-Access-Client-Id: !secret igw_cf_access_client_id",
-            "      CF-Access-Client-Secret: !secret igw_cf_access_client_secret",
-        ])
     lines.extend([
         "",
         "script:",
@@ -131,20 +150,15 @@ def render_package(tts_entity: str, media_player: str, cloudflare_access: bool, 
 
 
 def render_files(*, igw_url: str, tts_entity: str, media_player: str,
-                 cloudflare_access: bool = False, max_age: int = 30) -> dict[Path, str]:
-    validate_url(igw_url)
-    package = render_package(tts_entity, media_player, cloudflare_access, max_age)
+                 allow_local_http: bool = False, max_age: int = 30) -> dict[Path, str]:
+    validate_url(igw_url, allow_local_http=allow_local_http)
+    package = render_package(tts_entity, media_player, max_age)
     secrets = (
         "# Merge into HA secrets.yaml, which must remain outside version control.\n"
         "# This is an example, not a usable credential file.\n"
         f"igw_energy_url: {json.dumps(igw_url)}\n"
         'igw_energy_authorization: "Bearer REPLACE_WITH_SCOPED_READ_TOKEN"\n'
     )
-    if cloudflare_access:
-        secrets += (
-            'igw_cf_access_client_id: "REPLACE_WITH_CF_ACCESS_CLIENT_ID"\n'
-            'igw_cf_access_client_secret: "REPLACE_WITH_CF_ACCESS_CLIENT_SECRET"\n'
-        )
     return {
         Path("packages/igw_google_voice.yaml"): package,
         BLUEPRINT_RELATIVE_PATH: blueprint_source().read_text(),
@@ -198,17 +212,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     render = subparsers.add_parser("render-config", help="Render an HA package and blueprint for review.")
-    render.add_argument("--igw-url", required=True, help="Real HTTPS URL ending in /v1/energy; no credentials.")
+    render.add_argument("--igw-url", required=True, help="IGW URL ending in /v1/energy; HTTPS unless private HTTP is explicitly allowed.")
     render.add_argument("--tts-entity", required=True, help="Existing HA tts entity ID.")
     render.add_argument("--media-player", required=True, help="Existing HA Google Cast media_player entity ID.")
-    render.add_argument("--cloudflare-access", action="store_true", help="Require CF Access service-token secrets too.")
+    render.add_argument("--allow-local-http", action="store_true", help="Allow HTTP only for private IPs, localhost, or Kubernetes service DNS on a trusted network.")
     render.add_argument("--max-response-age", type=int, default=30)
     render.add_argument("--output", type=Path, required=True, help="New staging directory; never an active HA config directory.")
     args = parser.parse_args(argv)
     try:
         files = render_files(
             igw_url=args.igw_url, tts_entity=args.tts_entity, media_player=args.media_player,
-            cloudflare_access=args.cloudflare_access, max_age=args.max_response_age,
+            allow_local_http=args.allow_local_http, max_age=args.max_response_age,
         )
         write_files(args.output, files)
     except (ValueError, OSError) as exc:

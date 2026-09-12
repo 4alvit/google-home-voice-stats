@@ -12,10 +12,10 @@ def main():
     if len(sys.argv) != 2:
         raise SystemExit("Usage: python3 tests/make_ha_fixture.py NEW_OUTPUT_DIRECTORY")
     files = render_files(
-        igw_url="https://igw.home.test/v1/energy",
+        igw_url="http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy",
         tts_entity="tts.test_provider",
         media_player="media_player.test_nest",
-        cloudflare_access=True,
+        allow_local_http=True,
     )
     files[Path("configuration.yaml")] = (
         "homeassistant:\n"
@@ -24,10 +24,8 @@ def main():
         "  packages: !include_dir_named packages\n"
     )
     files[Path("secrets.yaml")] = (
-        'igw_energy_url: "https://igw.home.test/v1/energy"\n'
+        'igw_energy_url: "http://inverter-gateway.synology-apps.svc.cluster.local:8080/v1/energy"\n'
         'igw_energy_authorization: "Bearer offline-test-not-a-credential"\n'
-        'igw_cf_access_client_id: "offline-test-id"\n'
-        'igw_cf_access_client_secret: "offline-test-not-a-credential"\n'
     )
     write_files(Path(sys.argv[1]), files)
     print("Wrote an offline HA validation fixture with fake credentials.")

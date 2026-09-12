@@ -3,7 +3,7 @@
 Run offline tests and HA's configuration check before activating this package.
 Offline tests are not evidence of actual audio or Google account linking.
 
-On September 12, 2026, verification passed for the 18 automated adapter tests,
+On September 12, 2026, verification passed for the 21 automated adapter tests,
 actionlint, wheel installation and rendering outside the checkout, and an
 isolated configuration check in the deployment's Home Assistant 2026.9.1 runtime.
 That configuration check did not invoke the speakers or verify Google linking.
