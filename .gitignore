@@ -10,3 +10,8 @@ dist/
 rendered/
 secrets.yaml
 *.secrets.yaml
+.env
+.env.*
+!.env.example
+*.mp4
+*.wav

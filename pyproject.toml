@@ -4,16 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "igw-google-voice"
-version = "0.1.0"
-description = "Read-only IGW energy reports for Google Nest through Home Assistant"
+version = "0.2.0"
+description = "Read-only IGW energy reports for Google Nest, with standalone Cast and optional HA triggers"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["Jinja2==3.1.6", "PyYAML==6.0.3"]
+test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==12.3.0", "PyChromecast==14.0.10"]
+cast = ["PyChromecast==14.0.10", "Pillow==12.3.0"]
 
 [project.scripts]
 igw-google-voice = "igw_google_voice.__main__:main"
+igw-cast = "igw_google_voice.cast_service:main"
+igw-cast-ha = "igw_google_voice.cast_ha:main"
 
 [tool.setuptools]
 packages = ["igw_google_voice"]

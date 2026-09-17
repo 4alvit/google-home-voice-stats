@@ -18,7 +18,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
-        run: python3 -m pip install '.[test]'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng fonts-dejavu-core
+          python3 -m pip install '.[test,cast]'
       - name: Test response handling and rendered HA configuration
         run: bash scripts/ci.sh unit
       - name: Validate with Home Assistant 2026.9.2

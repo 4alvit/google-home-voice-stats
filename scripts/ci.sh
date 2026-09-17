@@ -13,9 +13,11 @@ if [[ "$mode" == config || "$mode" == all ]]; then
   command -v docker >/dev/null || { echo 'Docker is required for HA configuration validation.' >&2; exit 2; }
   stage=$(mktemp -d)
   trap 'rm -rf "$stage"' EXIT
-  python3 tests/make_ha_fixture.py "$stage/ha-check"
-  docker run --rm --entrypoint python \
-    -v "$stage/ha-check:/config" \
-    ghcr.io/home-assistant/home-assistant:2026.9.2 \
-    -m homeassistant --script check_config --config /config
+  for adapter in tts cast; do
+    python3 tests/make_ha_fixture.py --adapter "$adapter" "$stage/$adapter-check"
+    docker run --rm --entrypoint python \
+      -v "$stage/$adapter-check:/config" \
+      ghcr.io/home-assistant/home-assistant:2026.9.2 \
+      -m homeassistant --script check_config --config /config
+  done
 fi
