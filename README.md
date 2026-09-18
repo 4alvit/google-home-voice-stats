@@ -36,6 +36,10 @@ independently of this read-only adapter.
 See [CI and deployment workflow](docs/release-workflow.md) for required checks and local commands. This repository uses validation-only policy; application release channels do not apply.
 <!-- ci-release-process:end -->
 
+Manual GitHub source releases identify validated `main` commits for self-hosted
+installation. Their tags match the Python package version. Service deployment
+and Google Home setup remain installation steps.
+
 
 ## Requirements for the original HA speech adapter
 
