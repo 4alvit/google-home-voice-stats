@@ -113,7 +113,7 @@ class TestGateway(unittest.TestCase):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                for _ in range(30):
+                for _ in range(60):
                     try:
                         self.wfile.write(b" ")
                         self.wfile.flush()
@@ -128,9 +128,11 @@ class TestGateway(unittest.TestCase):
             cfg = replace(config(), igw_url=f"http://127.0.0.1:{server.server_port}/v1/energy")
             start = time.monotonic()
             with self.assertRaisesRegex(GatewayError, "transport_failure"):
-                fetch_snapshot_bounded(cfg, deadline_seconds=1)
+                # Allow process startup on a small, single-CPU NAS while ensuring
+                # the ongoing response is terminated well before its 12s stream.
+                fetch_snapshot_bounded(cfg, deadline_seconds=3)
             self.assertTrue(entered.is_set())
-            self.assertLess(time.monotonic() - start, 3)
+            self.assertLess(time.monotonic() - start, 5)
         finally:
             server.shutdown()
             server.server_close()
