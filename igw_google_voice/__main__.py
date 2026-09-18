@@ -177,7 +177,10 @@ def render_files(*, igw_url: str, tts_entity: str, media_player: str,
             "5. Call script.igw_google_{battery,solar,solar_today,status} and\n"
             "   script.igw_announce_alarms in HA.\n"
             "6. Expose only those five wrapper scripts to Google Assistant and assign\n"
-            "   their room. Keep script.igw_google_energy_dispatch private.\n\n"
+            "   their room. Keep script.igw_google_energy_dispatch private. Use either\n"
+            "   a paired Matter Hub bridge (docs/matter.md) or cloud scene account linking.\n"
+            "   Say 'turn on Energy status report' for Matter, or 'activate Energy status\n"
+            "   report' for cloud scenes, after the Hey Google wake phrase.\n\n"
             "See the repository README and docs/routines.md for validation and Google setup.\n"
         ),
     }

@@ -29,8 +29,8 @@ scripts alone do not prove the complete Google-to-HA voice path. Playback of one
 report also does not establish audible output for every report.
 
 For a new installation, test all five direct phrases in the README, any custom
-routines, and another intended household member after account linking and room
-assignment. Confirm the report is audible on the configured output speaker.
+routines, and another intended household member after Matter setup or cloud
+account linking and room assignment. Confirm the report is audible on the configured output speaker.
 Keep detailed operational evidence privately; publish only anonymized outcomes.
 
 ## Standalone Cast adapter

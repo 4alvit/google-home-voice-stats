@@ -5,7 +5,8 @@ display. Home Assistant is optional. A Linux host on the display's LAN, such as 
 NAS or small server, runs the service; do not install the renderer on a Cerbo GX.
 
 Data flow: **IGW read API → local renderer → Google default media receiver**.
-An optional voice trigger adds **Google scene → HA → authenticated local POST**.
+An optional voice trigger adds **Google → Matter bridge or cloud scene → HA →
+authenticated local POST**.
 IGW remains responsible for measurements, units, freshness and report wording.
 
 ## What the display shows
@@ -115,8 +116,10 @@ share a media URL. The service supports HEAD and byte ranges for Cast playback.
 
 ## Optional existing Google voice commands
 
-Keep an already working Google-to-HA account link. The standalone service does
-not establish that link and does not add direct Google voice command handling.
+Use an existing Matter bridge paired to Google Home, or a working Google-to-HA
+cloud account link. The standalone service does not establish either route or
+add direct Google voice command handling. See the [subscription-free Matter
+setup](matter.md) for exact script exposure and prerequisites.
 
 Render the smaller HA package:
 
@@ -135,7 +138,9 @@ IDs intentionally match. Preserve existing unrelated HA settings and secrets.
 Validate the complete HA configuration and restart/reload through the normal HA
 procedure. The generated package disables stored script traces and keeps REST
 logging at warning level because HA DEBUG logs can include credentials. It needs
-neither the IGW token nor a TTS provider. Reuse existing Google exposure for:
+neither the IGW token nor a TTS provider. Keep existing report entity IDs and
+names. With Matter, say **"Hey Google, turn on Energy status report"**, or
+substitute another report name. With cloud scene exposure, use:
 
 - "Hey Google, activate Battery report."
 - "Hey Google, activate Solar power report."
@@ -158,8 +163,9 @@ unavailable, use HA's normal validated restart procedure.
 
 All requests go to the configured display, regardless of which microphone hears
 the command. A short phrase such as "energy status" still needs a Google Routine.
-See [account linking and scene exposure](../README.md#link-google-and-expose-the-report-scenes).
-Existing HA exposure alone does not prove that Google's microphone route works.
+See [Matter or cloud setup](../README.md#link-google-and-expose-the-report-scenes).
+Existing HA exposure or Matter commissioning alone does not prove that Google's
+microphone route works.
 
 ## Verification and rollback
 

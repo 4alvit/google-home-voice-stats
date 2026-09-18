@@ -7,9 +7,10 @@ offline English speech. It uses Google's default media receiver: no custom Cast
 registration, paid TTS service, or Home Assistant installation is required for output.
 
 **Start with the [standalone Cast setup](docs/standalone-cast.md).** Home Assistant
-can optionally forward existing Google voice scenes to this service. Its five scene
-names remain unchanged. Cast alone does not add "Hey Google" commands; a working
-Google account link is still required for that optional voice entry point.
+can optionally forward Google voice commands to this service through an existing
+Matter bridge or a cloud account link. Its five report names remain unchanged.
+Cast alone does not add "Hey Google" commands. For a subscription-free voice
+entry point with a compatible Google hub, see the [Matter setup](docs/matter.md).
 
 The original HA speech-only adapter remains available below for installations
 that prefer their existing TTS voice or use audio-only speakers.
@@ -19,14 +20,15 @@ selection, units, battery and solar statistics, freshness, and report wording.
 The standalone Cast adapter handles report presentation and transport. In the
 original speech-only mode, HA performs that role. Neither calculates energy
 statistics. IGW runs its data pipeline independently of HA. With the optional HA
-trigger, Google invokes one of five scripts as a scene and HA requests playback
-from the standalone service.
+trigger, Google invokes one of five scripts through Matter or as a cloud scene,
+and HA requests playback from the standalone service.
 
 This repository contains the standalone service, container deployment, offline
 video renderer, optional HA trigger renderer, original HA blueprint, and tests.
-**There is no Google skill or store app to install.** Existing Google-to-HA
-account linking can expose the report scripts as scenes. Ordinary device control
-remains available independently of this read-only adapter.
+**There is no Google skill or store app to install.** Home Assistant Matter Hub
+can expose the scripts as momentary on/off devices; Google-to-HA cloud account
+linking can expose them as scenes. Ordinary device control remains available
+independently of this read-only adapter.
 
 <!-- ci-release-process:start -->
 ## CI and deployment
@@ -46,9 +48,10 @@ See [CI and deployment workflow](docs/release-workflow.md) for required checks a
 - Home Assistant 2024.8 or newer, a working `tts.*` provider, and a Google Cast
   `media_player.*` entity. CI validates configuration against HA 2026.9.2; older
   supported syntax still needs verification on your installation.
-- A Google Home household and one HA-to-Google account link, as described below.
-  The adapter itself does not require a paid voice service; the chosen linking
-  provider may require a subscription.
+- A Google Home household and either a paired Home Assistant Matter Hub bridge
+  with a compatible Google hub, or an HA-to-Google cloud account link, as
+  described below. Matter needs no Homeway or Nabu Casa subscription; a cloud
+  linking provider may require one.
 - Python 3.11+ for the renderer. Runtime Python dependencies: none.
 
 ## Setup order
@@ -152,7 +155,7 @@ The generated files are:
    `script.igw_google_solar`, `script.igw_google_solar_today`,
    `script.igw_google_status`, and `script.igw_announce_alarms`. Each should speak
    its own current report.
-7. Continue with Google linking and scene exposure below.
+7. Continue with Matter or cloud exposure below.
 
 The selected Nest is the output for every report, regardless of which speaker
 hears the request. This adapter does not identify the requesting speaker. Its
@@ -163,8 +166,21 @@ can still interfere. Cast must be able to fetch HA's generated audio URL; see
 
 ## Link Google and expose the report scenes
 
-Choose **one** linking route for these scripts. Reuse an existing working link
-when available; linking the same scripts twice creates duplicate scene names.
+Choose **one** route for these scripts. Reuse an existing working bridge or
+account link when available; exposing the same scripts twice creates ambiguous
+report names.
+
+**Matter: no voice-integration subscription.** Use the maintained
+[Home Assistant Matter Hub](https://riddix.github.io/home-assistant-matter-hub/)
+to expose only the five public scripts as on/off plug endpoints. Turning one on
+runs its report; it immediately reads as off again. A compatible Google Matter
+hub and a bridge paired to the intended Google Home are required. Follow the
+[exact entity filter, pairing, and validation steps](docs/matter.md). An existing
+Python Matter Server alone is a controller, not an HA entity-export bridge.
+For this route say **"Hey Google, turn on Energy status report."** The cloud
+linking, scene exposure, and sync instructions below do not apply to Matter.
+
+**Cloud scenes: choose one provider if using this route.**
 
 - **Home Assistant Cloud by Nabu Casa — optional paid service.** It requires a
   subscription after its trial. In HA, set up Cloud, enable Google Assistant
@@ -195,7 +211,7 @@ Google Home menu labels vary by app version: **Works with Google Home** is
 available in the add-device flow or Home settings. Use the Google account and
 Home that contain the Nest you will speak to.
 
-Expose these five adapter entities, keeping their generated names:
+For the cloud route, expose these five adapter entities, keeping their generated names:
 
 - `script.igw_google_battery` — **Battery report**.
 - `script.igw_google_solar` — **Solar power report**.
@@ -216,7 +232,15 @@ members; see [HA's room guidance](https://www.home-assistant.io/integrations/goo
 
 ## Use the reports
 
-After linking, exposure, and sync, say these English commands:
+After [Matter setup](docs/matter.md), say these English commands:
+
+- **"Hey Google, turn on Battery report."**
+- **"Hey Google, turn on Solar power report."**
+- **"Hey Google, turn on Solar today report."**
+- **"Hey Google, turn on Energy status report."**
+- **"Hey Google, turn on Energy alarms report."**
+
+For the cloud scene route, after account linking, exposure, and sync, use:
 
 - **"Hey Google, activate Battery report."**
 - **"Hey Google, activate Solar power report."**
@@ -224,32 +248,37 @@ After linking, exposure, and sync, say these English commands:
 - **"Hey Google, activate Energy status report."**
 - **"Hey Google, activate Energy alarms report."**
 
-Use the corresponding scene name if you renamed a script in Google. Each command
+Use the corresponding report name if you renamed it in Google. Each command
 fetches a current IGW report and plays it on the **fixed Nest selected when
 rendering the configuration**. Speaking to another Nest does not change the
 output speaker. The commands only read reports; they do not control the inverter.
 
 For shorter phrases, optionally create a Google Home automation/routine with a
-voice starter such as **"battery status"**, and an action activating **Battery
-report**. Repeat with **"solar power"**, **"solar today"**, **"energy status"**,
-and **"energy alarms"** for their matching scenes. Where a custom Assistant
+voice starter such as **"battery status"**, and an action turning on the Matter
+device **Battery report** or activating the cloud scene of that name. Repeat with
+**"solar power"**, **"solar today"**, **"energy status"**, and **"energy alarms"**
+for their matching reports. Where a custom Assistant
 action is available, use the direct command you verified in your installation,
-such as **"activate Battery report"**. The short phrases work only after you create these routines; they are
+such as **"turn on Battery report"** for Matter. The short phrases work only after you create these routines; they are
 not registered automatically. See [routine details](docs/routines.md) and
 [Google's automation setup](https://support.google.com/googlehome/answer/16214649?hl=en).
 
 ## Troubleshooting
 
-- **Google cannot find a report:** confirm the chosen account link, expose the
-  five scripts, check their scene names and room, and sync again. Test the direct
-  "activate … report" command before a custom routine. An absent dashboard tile
-  alone does not indicate failure.
+- **Google cannot find a report:** for Matter, check the bridge's exact entity
+  filter, live connection to Google, and report devices in the intended Home;
+  test "turn on Energy status report". See [Matter diagnostics](docs/matter.md#verify-the-complete-path).
+  For cloud scenes, confirm the account link, script exposure, names and room,
+  then sync again and test "activate Energy status report". An absent cloud
+  scene dashboard tile alone does not indicate failure.
 - **It works for one person only:** check Google Home membership and room
   assignment. Manual Google projects also require the
   [additional-user setup](https://www.home-assistant.io/integrations/google_assistant/#allow-other-users).
-- **Google responds but no report plays:** call the wrapper in HA's Actions tool,
-  then test `tts.speak` with the selected provider and speaker. Check that Cast
-  can retrieve HA's audio URL and that you are listening to the configured Nest.
+- **Google responds but no report plays:** call the wrapper in HA's Actions tool.
+  For standalone Cast, follow [its playback checks](docs/standalone-cast.md#verification-and-rollback).
+  For the original speech adapter, test `tts.speak` with the selected provider
+  and speaker and check that Cast can retrieve HA's audio URL. Listen to the
+  configured output device.
 - **A connection-error sentence plays:** verify the IGW URL, scoped token, direct
   HTTP 200 JSON response, and clock synchronization. A spoken stale/unavailable
   warning instead comes from IGW; investigate the gateway's data sources.
@@ -258,7 +287,7 @@ not registered automatically. See [routine details](docs/routines.md) and
   as well as the Google project; importing this adapter does not create either.
 
 Use [the smoke tests](docs/testing.md) to distinguish API, speech, and Google
-account-link failures. Keep credentials and private diagnostics outside Git.
+voice-route failures. Keep credentials and private diagnostics outside Git.
 
 ## Failure behavior
 
@@ -291,11 +320,11 @@ script wiring, and cover gateway warnings, missing data, bad schemas, stale and
 future timestamps, HTTP failures, output collisions, and invalid inputs. The
 container fixture uses fake credentials and does not invoke the API or speakers.
 CI runs both tests and the HA configuration check. Physical voice recognition,
-Google account linking, actual gateway access, and audible Nest playback require
+Google routing through Matter or account linking, actual gateway access, and audible Nest playback require
 the installation smoke tests in [docs/testing.md](docs/testing.md).
 
 See [the anonymized validation record](docs/deployment-validation.md) for the
-verified scope and the remaining physical voice/account-link checks. A successful
+verified scope and the remaining physical voice checks. A successful
 Cast action alone does not establish human audibility or Google microphone access.
 
 License: MIT.

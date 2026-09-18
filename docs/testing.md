@@ -1,10 +1,19 @@
 # Installation smoke tests
 
 Run offline tests and HA's configuration check before activating this package.
-Offline tests are not evidence of actual audio or Google account linking.
+Offline tests are not evidence of actual audio or Google voice routing.
 
 See the [anonymized validation record](deployment-validation.md) for completed
 checks and their limits. Run this checklist for your own installation.
+
+For the standalone adapter, start with the [Cast acceptance checks](standalone-cast.md#verification-and-rollback).
+For Google commands through Matter, follow the [complete path checks](matter.md#verify-the-complete-path):
+Google's on command must cause a new HA script invocation and the corresponding
+Cast request must play. A saved fabric, an exposed endpoint, or a successful SDK
+call with empty response text does not prove this path. Verify microphone
+recognition, screen appearance and audibility on the physical device separately.
+
+## Original HA speech adapter
 
 1. Verify the selected Nest entity and TTS provider with a short `tts.speak`
    action. Set `target.entity_id` to the `tts.*` entity and
@@ -15,7 +24,8 @@ checks and their limits. Run this checklist for your own installation.
 3. Issue two different report requests quickly. They should execute through the
    shared queue, fetching when each run begins, and speak in order. Playback
    waiting is bounded; check the selected Nest's state reporting if they overlap.
-4. Test each exposed scene directly through Google, then each configured Routine.
+4. Test each report directly through Google using `turn on` for Matter or
+   `activate` for cloud scenes, then each configured routine.
    Repeat with another household member to verify room assignment and access.
 5. Use a separate staging IGW endpoint/HA configuration for failures: return 401,
    403, 503, an HTML login page, a malformed envelope, or an old `generated_at`.
