@@ -1,21 +1,34 @@
 # Report phrases
 
-- "Hey Google, battery status" → Routine activates **Battery report** →
+For Matter, say **"Hey Google, turn on Energy status report"**. Substitute any
+of the five report names below. For cloud scenes, use **"Hey Google, activate
+Energy status report"** instead. Test the direct command for your route before
+adding shorter routine phrases.
+
+After the optional [HA display-name override](matter.md#use-a-shorter-name), the
+direct Matter command is **"Hey Google, turn on Energy"**. It invokes
+`script.igw_google_status` without a routine. The bare phrase **"Hey Google,
+energy"** still requires a routine.
+
+Optional routines map these voice starters to the corresponding report. Their
+action turns on the Matter device or activates the cloud scene:
+
+- "Hey Google, battery status" → **Battery report** →
   `script.igw_google_battery` → IGW `reports.battery.text`.
-- "Hey Google, solar power" → Routine activates **Solar power report** →
+- "Hey Google, solar power" → **Solar power report** →
   `script.igw_google_solar` → IGW `reports.solar.text`.
-- "Hey Google, solar today" → Routine activates **Solar today report** →
+- "Hey Google, solar today" → **Solar today report** →
   `script.igw_google_solar_today` → IGW `reports.solar_today.text`.
-- "Hey Google, energy status" → Routine activates **Energy status report** →
+- "Hey Google, energy status" → **Energy status report** →
   `script.igw_google_status` → IGW `reports.status.text`.
 
-- "Hey Google, energy alarms" → Routine activates **Energy alarms report** →
+- "Hey Google, energy alarms" → **Energy alarms report** →
   `script.igw_announce_alarms` → IGW `reports.alarms.text`.
 
-For a direct test without a Routine, say "Hey Google, activate Battery report"
-or substitute another scene name. These phrases only work after linking,
-exposure, room assignment, device sync, and (for the short forms) creating the
-Routine. The repository cannot create Google account settings on your behalf.
+These phrases require either [Matter setup](matter.md) or cloud account linking
+and scene exposure. The routine voice starters listed above additionally require
+creating the routine; the renamed direct Matter command does not.
+The repository does not create Google account settings or routines on your behalf.
 
 All five paths read IGW. They never change charge settings, loads, relays,
 thermostats, or inverter configuration.

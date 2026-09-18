@@ -29,4 +29,7 @@ branch and the `production` environment; validation never deploys resources.
 ## Coverage limits
 
 - Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.
-- Syntax baseline only: YAML/JSON/Python/shell/JavaScript where present. No application tests, browser playback, cluster rendering or deployment checks implied.
+- Adapter tests cover response handling, standalone Cast behavior and rendered
+  Home Assistant configuration. Both generated package modes are checked with
+  HA 2026.9.2 and offline fixtures. Live IGW, Google voice routing, physical
+  playback and production deployment remain separate installation checks.

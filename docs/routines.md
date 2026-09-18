@@ -1,9 +1,29 @@
 # Google Home phrases and Home Assistant scripts
 
-The adapter exposes five HA scripts. Google Assistant treats supported HA scripts
-as scenes, so requesting a scene starts the wrapper without parameters. The
-wrapper passes a fixed report key to the private dispatcher. There is no public
-webhook and no need to put an IGW token into a Google Routine.
+The adapter exposes five public HA scripts. Either a Matter on command or a
+cloud scene activation starts a wrapper without parameters. The wrapper passes
+a fixed report key to the private dispatcher. There is no public webhook and no
+need to put an IGW token into a Google routine.
+
+## Matter route
+
+1. Complete the [Matter setup](matter.md) and confirm the five report devices
+   appear in the intended Google Home. Keep the dispatcher unexposed.
+2. Try **"Hey Google, turn on Battery report"** before creating a routine.
+   Confirm both the HA script invocation and playback on the selected display.
+3. Create a Google Home automation/routine with the voice starter **"battery
+   status"**. Choose a device action that turns on **Battery report**. If only a
+   custom Assistant action is available, use the verified direct command
+   **"turn on Battery report"**. Available actions vary by app and account.
+4. Repeat for **"solar power"**, **"solar today"**, **"energy status"**, and
+   **"energy alarms"**, choosing the matching device in the
+   [report catalog](utterance-catalog.md). Check intended household members can
+   use the reports.
+
+Matter does not require cloud scene exposure or an HA-to-Google account link.
+Use one route per report to avoid duplicate names.
+
+## Cloud scene route
 
 1. Complete one of the [account-linking routes in the README](../README.md#link-google-and-expose-the-report-scenes).
    This adapter has no standalone Google skill or store listing.
@@ -33,12 +53,12 @@ webhook and no need to put an IGW token into a Google Routine.
 6. Repeat for "solar power", "solar today", "energy status", and "energy alarms", choosing the
    matching scene from [utterance-catalog.md](utterance-catalog.md).
 
-Both the custom phrase and direct scene activation cause a fresh API request.
-The response always plays on the Nest configured in the dispatcher blueprint,
-not automatically on the speaker hearing the voice command. The current gateway
-report text is spoken unchanged, including its unavailable or stale warning.
+Both routes cause a fresh API request. The response plays on the display
+configured in the standalone Cast service, or the Nest selected in the original
+HA speech blueprint, regardless of which microphone hears the request. IGW's
+unavailable or stale warning is preserved in the report.
 
-These are report scenes, not synthetic temperature sensors. Generic "what is the
+These triggers request reports. Generic "what is the
 battery sensor" queries are not the supported path: Google does not expose all
 HA sensor classes as queryable sensors. See
 [HA's supported domains](https://www.home-assistant.io/integrations/google_assistant/#available-domains).
