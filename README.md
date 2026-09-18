@@ -1,21 +1,32 @@
 # IGW energy reports on Google Home / Nest
 
-Ask Google for battery charge, solar power, today's solar energy, an energy
-summary, or active alarms. Home Assistant fetches a current report from the Inverter Gateway (IGW)
-and speaks the gateway's text on a selected Nest speaker.
+Show and speak battery charge, solar power, today's solar energy, an energy
+summary, or active alarms on a Google Cast display. The standalone adapter fetches
+a current Inverter Gateway (IGW) report and generates a short dashboard video with
+offline English speech. It uses Google's default media receiver: no custom Cast
+registration, paid TTS service, or Home Assistant installation is required for output.
+
+**Start with the [standalone Cast setup](docs/standalone-cast.md).** Home Assistant
+can optionally forward existing Google voice scenes to this service. Its five scene
+names remain unchanged. Cast alone does not add "Hey Google" commands; a working
+Google account link is still required for that optional voice entry point.
+
+The original HA speech-only adapter remains available below for installations
+that prefer their existing TTS voice or use audio-only speakers.
 
 The data path is **Victron/MQTT → IGW → read-only API**. IGW owns source
 selection, units, battery and solar statistics, freshness, and report wording.
-Home Assistant is required for this Google adapter and handles voice and report
-transport; it does not collect or calculate those measurements. IGW runs its data
-pipeline independently of HA. Google Assistant invokes one of five HA scripts
-as a scene; a shared queued script fetches and speaks the requested report.
+The standalone Cast adapter handles report presentation and transport. In the
+original speech-only mode, HA performs that role. Neither calculates energy
+statistics. IGW runs its data pipeline independently of HA. With the optional HA
+trigger, Google invokes one of five scripts as a scene and HA requests playback
+from the standalone service.
 
-This repository contains an installable HA script blueprint, a configuration
-renderer, and tests. **There is no standalone Google skill or store app to
-install.** Install the adapter in HA, then expose its scripts through your chosen
-HA-to-Google account link. Google sees them as scenes. Ordinary device control
-remains available through that integration independently of this read-only adapter.
+This repository contains the standalone service, container deployment, offline
+video renderer, optional HA trigger renderer, original HA blueprint, and tests.
+**There is no Google skill or store app to install.** Existing Google-to-HA
+account linking can expose the report scripts as scenes. Ordinary device control
+remains available independently of this read-only adapter.
 
 <!-- ci-release-process:start -->
 ## CI and deployment
@@ -24,7 +35,7 @@ See [CI and deployment workflow](docs/release-workflow.md) for required checks a
 <!-- ci-release-process:end -->
 
 
-## Requirements
+## Requirements for the original HA speech adapter
 
 - An IGW deployment serving authenticated `GET /v1/energy` over HTTPS with a valid
   certificate, or explicitly opted-in HTTP within a trusted private network, and

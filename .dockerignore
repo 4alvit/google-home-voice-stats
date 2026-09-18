@@ -1,0 +1,9 @@
+**
+!pyproject.toml
+!README.md
+!LICENSE
+!igw_google_voice/
+!igw_google_voice/**
+!blueprints/
+!blueprints/**
+**/__pycache__

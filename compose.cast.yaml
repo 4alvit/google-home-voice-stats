@@ -1,0 +1,33 @@
+services:
+  igw-cast:
+    build:
+      context: .
+      dockerfile: Dockerfile.cast
+    image: igw-cast:local
+    restart: unless-stopped
+    # Linux host networking reaches the fixed Cast device on the home LAN.
+    network_mode: host
+    env_file: .env
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 384m
+    # CPU affinity also works on NAS kernels without CPU CFS quota support.
+    cpuset: "${CAST_CPUSET:-0}"
+    pids_limit: ${CAST_PIDS_LIMIT:-96}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import os, urllib.request;
+          from urllib.parse import urlsplit;
+          host = os.environ.get('CAST_BIND_HOST') or urlsplit(os.environ['CAST_MEDIA_BASE_URL']).hostname;
+          host = '127.0.0.1' if host == '0.0.0.0' else host;
+          urllib.request.urlopen('http://' + host + ':' + os.environ.get('CAST_PORT', '8091') + '/healthz', timeout=3).close()
+      interval: 30s
+      timeout: 5s
+      retries: 3
