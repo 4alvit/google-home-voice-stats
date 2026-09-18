@@ -14,8 +14,9 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 384m
-    cpus: 1.0
-    pids_limit: 96
+    # CPU affinity also works on NAS kernels without CPU CFS quota support.
+    cpuset: "${CAST_CPUSET:-0}"
+    pids_limit: ${CAST_PIDS_LIMIT:-96}
     healthcheck:
       test:
         - CMD

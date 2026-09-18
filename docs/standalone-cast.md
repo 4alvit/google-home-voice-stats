@@ -55,7 +55,14 @@ custom conversational Action or make the project eligible for a Google store lis
 5. Generate a separate `CAST_API_TOKEN`, for example with
    `python3 -c 'import secrets; print(secrets.token_urlsafe(32))'`.
    Use at least 32 characters. This authorizes playback only; it is not the IGW token.
-6. Build and start:
+6. Choose one available logical CPU with `CAST_CPUSET` (default `0`). CPU affinity
+   works on NAS kernels that lack Docker CPU CFS quotas. Check
+   `docker info --format '{{.CPUSet}} {{.PidsLimit}} {{.MemoryLimit}}'`.
+   If the PIDs controller is unavailable, set `CAST_PIDS_LIMIT=0`; otherwise keep
+   the default limit of 96. HTTP concurrency and report subprocesses remain bounded
+   by the application, but a kernel without this controller cannot enforce a
+   container-wide PIDs cap. Memory limits and CPU affinity must be supported.
+7. Build and start:
 
    ```bash
    docker compose -f compose.cast.yaml build
