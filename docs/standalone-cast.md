@@ -143,6 +143,19 @@ neither the IGW token nor a TTS provider. Reuse existing Google exposure for:
 - "Hey Google, activate Energy status report."
 - "Hey Google, activate Energy alarms report."
 
+An installation with the `logger.set_level`, `rest_command.reload` and
+`script.reload` actions can load this replacement without restarting all of HA.
+After backing up and validating the complete configuration, call
+`logger.set_level` with `homeassistant.components.rest_command: warning`, then
+`rest_command.reload` and `script.reload`. The logger action applies the privacy
+setting to the running process; the generated package preserves it across
+restarts. Verify that `rest_command.igw_cast_report` and all five report scripts
+are present before invoking `script.igw_google_status`. Do not treat a successful
+reload or HTTP 202 as playback proof: check that this invocation transitions the
+Cast service through `running` to `idle` with result `report_played`, and confirm
+cards and speech on the selected display. If the required reload actions are
+unavailable, use HA's normal validated restart procedure.
+
 All requests go to the configured display, regardless of which microphone hears
 the command. A short phrase such as "energy status" still needs a Google Routine.
 See [account linking and scene exposure](../README.md#link-google-and-expose-the-report-scenes).

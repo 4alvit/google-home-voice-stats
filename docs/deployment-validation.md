@@ -52,8 +52,31 @@ authentication, concurrent request rejection, expiring byte-range media delivery
 offline speech/video generation, private diagnostics and both HA package modes.
 Both HA packages passed isolated configuration checks with HA 2026.9.2.
 
-No reachable display was available for physical playback acceptance. Only the
-container images and source package were staged: a target-specific service was
-not started, and existing HA voice routing was retained. Cast screen appearance,
-audibility and Google microphone invocation remain unverified. A valid MP4,
-passing tests and a successful IGW fetch do not establish those device checks.
+The merged runtime was subsequently installed as a private-LAN service targeting
+one Lenovo Smart Display 10. Its identity matched the existing device registry.
+The service passed its health check, and all pre-existing containers remained
+unchanged. The display retrieved the generated media from the NAS and reported
+`PLAYING` for that request's exact media URL. The service completed with
+`report_played`, rather than its connection-error fallback. This verifies actual
+receiver playback of an IGW report, beyond MP4 generation or request acceptance.
+The live API rejected unauthenticated requests with HTTP 401 and a concurrent
+report request with HTTP 409, without starting another playback.
+
+The optional HA trigger was installed after standalone playback succeeded. Full
+installed-configuration checks passed before and after the replacement. REST
+commands and scripts were reloaded without restarting HA, and REST logging was
+set to warning in the running process. All five report names, entity-registry
+settings and unrelated configuration files were preserved. HA stores only a
+separate local playback token for this trigger; the independent service handles
+the authenticated IGW read, rendering and Cast playback.
+
+Invoking the public `script.igw_google_status` then exercised the HA dispatcher
+and local REST command. An independent observer saw the new request's exact
+media URL reach `PLAYING` on the display, with advancing playback time. The
+service again completed with `report_played` and no gateway fallback. The
+observer issued no playback commands of its own.
+
+Receiver protocol status does not establish physical screen appearance or human
+audibility. Those checks and Google microphone invocation require confirmation
+on the device. Detailed identifiers, credentials and household media are not
+part of this public validation record.
