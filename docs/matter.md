@@ -96,6 +96,24 @@ Every report plays on the output selected in the Cast service (or original HA
 speech adapter), regardless of which microphone hears the request. Request one
 report at a time; the standalone service rejects a concurrent request as busy.
 
+### Use a shorter name
+
+For a shorter direct command, open `script.igw_google_status` in HA's entity
+settings and set its display name to **Energy**. Keep the entity ID unchanged.
+Use a name that does not conflict with another device in your Google Home.
+
+On the verified Matter Hub version, the HA name override updates the existing
+endpoint's label dynamically. No bridge restart or new pairing is needed. Check
+that Matter Hub shows **Energy**, then test **"Hey Google, turn on Energy."**
+Confirm that the requested HA script runs and the report plays; a successful
+name update in HA alone does not prove Google has adopted it.
+
+This is an optional installation setting. Generated packages retain their
+default report names, while HA's entity-registry override preserves your chosen
+display name for the same entity ID. To undo it, clear the name override in HA.
+An even shorter phrase such as **"Hey Google, energy"** needs a Google Home
+routine with that voice starter and an action turning on this report device.
+
 ## Verify the complete path
 
 1. Check that the bridge is running, all original endpoints remain, and exactly

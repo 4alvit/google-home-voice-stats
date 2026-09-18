@@ -122,6 +122,19 @@ screen appearance, other household members' access, or live voice invocation of
 all five reports. Those remain installation checks. One transient transport
 failure also remains part of the observed reliability record.
 
+The operator subsequently confirmed that the status report works on the physical
+display. That user confirmation supplements the automated receiver observation;
+it does not establish voice invocation of the other four reports or access by
+other household members.
+
+The main report was then renamed to **Energy** using only HA's entity-registry
+display-name override. Its entity ID and all Matter endpoint identities,
+commissioning fabrics, filters, mappings and unrelated names were preserved.
+One SDK command, `turn on Energy`, invoked the intended status script. The
+independent observer confirmed the new media URL reached `PLAYING`, playback
+time advanced, and the service completed with `report_played` without a fallback.
+No restart, new pairing or Google routine was needed for this shorter command.
+
 The documentation and generated installation instructions passed independent
 review. All 54 tests passed without skips in Linux CI, and both generated HA
 package modes passed configuration checks with HA 2026.9.2. Generated runtime
