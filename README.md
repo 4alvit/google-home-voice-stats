@@ -253,6 +253,12 @@ fetches a current IGW report and plays it on the **fixed Nest selected when
 rendering the configuration**. Speaking to another Nest does not change the
 output speaker. The commands only read reports; they do not control the inverter.
 
+For the shorter Matter command **"Hey Google, turn on Energy"**, set the display
+name of `script.igw_google_status` to **Energy** in HA while keeping its entity
+ID unchanged. Follow the [short-name setup and verification](docs/matter.md#use-a-shorter-name).
+This direct command needs no Google routine. The bare phrase **"Hey Google,
+energy"** requires a routine with that voice starter.
+
 For shorter phrases, optionally create a Google Home automation/routine with a
 voice starter such as **"battery status"**, and an action turning on the Matter
 device **Battery report** or activating the cloud scene of that name. Repeat with
