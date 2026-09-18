@@ -105,7 +105,8 @@ report at a time; the standalone service rejects a concurrent request as busy.
    should change the HA wrapper's `last_triggered` timestamp. For Matter, cloud
    scene exposure settings and "sync my devices" are not substitutes for
    checking bridge discovery and connectivity.
-3. For standalone output, confirm the corresponding new request reaches the Cast service, its exact
+3. For standalone output, confirm the corresponding new request reaches the
+   Cast service, its exact
    temporary media URL reaches `PLAYING` on the selected receiver, playback time
    advances, and the service records `report_played`. HTTP 202 or a script
    returning to idle proves only request acceptance. A stale/unavailable IGW

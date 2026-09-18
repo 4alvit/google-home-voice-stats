@@ -320,7 +320,8 @@ script wiring, and cover gateway warnings, missing data, bad schemas, stale and
 future timestamps, HTTP failures, output collisions, and invalid inputs. The
 container fixture uses fake credentials and does not invoke the API or speakers.
 CI runs both tests and the HA configuration check. Physical voice recognition,
-Google routing through Matter or account linking, actual gateway access, and audible Nest playback require
+Google routing through Matter or account linking, actual gateway access, and
+audible Nest playback require
 the installation smoke tests in [docs/testing.md](docs/testing.md).
 
 See [the anonymized validation record](docs/deployment-validation.md) for the

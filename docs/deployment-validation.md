@@ -30,7 +30,8 @@ report also does not establish audible output for every report.
 
 For a new installation, test all five direct phrases in the README, any custom
 routines, and another intended household member after Matter setup or cloud
-account linking and room assignment. Confirm the report is audible on the configured output speaker.
+account linking and room assignment. Confirm the report is audible on the
+configured output speaker.
 Keep detailed operational evidence privately; publish only anonymized outcomes.
 
 ## Standalone Cast adapter
@@ -80,3 +81,48 @@ Receiver protocol status does not establish physical screen appearance or human
 audibility. Those checks and Google microphone invocation require confirmation
 on the device. Detailed identifiers, credentials and household media are not
 part of this public validation record.
+
+## Google reports through Matter
+
+The existing Home Assistant Matter Hub 2.0.56 bridge was updated through its
+supported configuration API to include only the five public report scripts in
+addition to its original device. All five appeared as `OnOffPlugInUnit`
+endpoints with their expected English report names. The original endpoint
+identity, bridge settings and commissioning fabrics were preserved. The private
+dispatcher remained excluded, and the exact filter was verified in persistent
+storage. No bridge restart or recommissioning was performed. Protected backups
+and a filter-only rollback were retained outside the repository.
+
+After removal of an unused Homeway cloud integration and a controlled HA
+restart, HA reconnected to Matter Hub. The existing Google fabric had an active
+session and subscription. The cloud `google_assistant` integration was unloaded;
+Google Assistant SDK, Matter, Cast and the report scripts remained available.
+
+One SDK command, `turn on Energy status report`, was followed by new command
+activity on the Google Matter fabric and invocation of the requested HA wrapper.
+An independent observer saw the exact new media URL reach `PLAYING` on the
+configured display with advancing playback time. This first request completed
+with `fallback_played`: it exercised the trigger and playback path, but failed
+to deliver an IGW report. The service recorded a transport failure. A subsequent
+read-only IGW request returned HTTP 200 with all five reports marked fresh;
+no persistent authentication or configuration fault was found.
+
+A single full retry again correlated Google Matter command activity with the
+requested HA script. Its new media URL reached `PLAYING`, playback time advanced,
+and the service completed with `report_played` and no fallback. The observer
+submitted no commands or playback requests. Both the initial failure and the
+successful retry were retained as private evidence; no configuration change was
+needed between them.
+
+This supports the Google-to-Matter-to-HA-to-Cast actuation path. Matter command
+attribution is based on fabric/session timing and the requested HA script; the
+available health receipt does not include an endpoint-specific command trace.
+The SDK test does not prove physical microphone recognition, human audibility,
+screen appearance, other household members' access, or live voice invocation of
+all five reports. Those remain installation checks. One transient transport
+failure also remains part of the observed reliability record.
+
+The documentation and generated installation instructions passed independent
+review. All 54 tests passed without skips in Linux CI, and both generated HA
+package modes passed configuration checks with HA 2026.9.2. Generated runtime
+YAML and application behavior were unchanged by the documentation update.
