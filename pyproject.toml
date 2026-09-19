@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "igw-google-voice"
-version = "0.2.0"
+version = "0.3.0"
 description = "Read-only IGW energy reports for Google Nest, with standalone Cast and optional HA triggers"
 requires-python = ">=3.11"
 dependencies = []
