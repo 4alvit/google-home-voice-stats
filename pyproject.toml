@@ -12,6 +12,7 @@ dependencies = []
 [project.optional-dependencies]
 test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==12.3.0", "PyChromecast==14.0.10"]
 cast = ["PyChromecast==14.0.10", "Pillow==12.3.0"]
+piper = ["piper-tts==1.8.0"]
 
 [project.scripts]
 igw-google-voice = "igw_google_voice.__main__:main"
@@ -23,3 +24,4 @@ packages = ["igw_google_voice"]
 
 [tool.setuptools.data-files]
 "share/igw-google-voice/blueprints/script/igw" = ["blueprints/script/igw/announce_energy.yaml"]
+"share/igw-google-voice/blueprints/automation/igw" = ["blueprints/automation/igw/battery_reserve.yaml", "blueprints/automation/igw/energy_condition.yaml", "blueprints/automation/igw/daily_briefing.yaml"]

@@ -5,11 +5,24 @@ from __future__ import annotations
 import json
 import math
 import multiprocessing
+import socket
+import ssl
+import errno
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
-REPORT_KEYS = ("battery", "solar", "solar_today", "status", "alarms")
+BASE_REPORT_KEYS = ("battery", "solar", "solar_today", "status", "alarms")
+REPORT_KEYS = (*BASE_REPORT_KEYS, "flow")
+FLOW_UNCONFIGURED = "Energy flow is not configured. Ask the gateway administrator to configure flow measurements."
+METRICS = {
+    "battery_soc": ("battery", "%", 0, 100),
+    "solar_power": ("solar", "W", 0, 1e12),
+    "solar_today": ("solar_today", "kWh", 0, 1e12),
+    "load_power": ("flow", "W", 0, 1e12),
+    "grid_power": ("flow", "W", -1e12, 1e12),
+    "battery_power": ("flow", "W", -1e12, 1e12),
+}
 STATUSES = ("fresh", "stale", "unavailable", "unconfigured")
 FALLBACK = "I cannot get a current energy report right now. Please try again."
 MAX_BODY = 262144
@@ -22,6 +35,32 @@ class GatewayError(Exception):
 class NoRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def optional_metric(value, key: str, *, report_status: str | None) -> dict | None:
+    """Accept display values without copying source identifiers or inventing zeros."""
+    if not isinstance(value, dict) or key not in METRICS:
+        return None
+    _, unit, minimum, maximum = METRICS[key]
+    status, numeric, age = value.get("status"), value.get("value"), value.get("age_seconds")
+    if (not isinstance(status, str) or status not in STATUSES or report_status is not None and status != report_status
+        or value.get("unit") != unit):
+        return None
+    if status == "fresh":
+        if (type(numeric) not in (int, float) or not minimum <= numeric <= maximum
+            or not math.isfinite(numeric)):
+            return None
+    elif numeric is not None:
+        return None
+    clean = {"status": status, "value": numeric, "unit": unit}
+    if type(age) is int and 0 <= age <= 2**64 - 1:
+        clean["age_seconds"] = age
+    return clean
+
+
+def _valid_text(text):
+    return (isinstance(text, str) and 0 < len(text.strip()) <= 1200
+            and not any(ord(char) < 32 and char not in "\n\t\r" for char in text))
 
 
 def validate_snapshot(body: object, *, now: float, max_age: int = 30) -> dict:
@@ -44,25 +83,48 @@ def validate_snapshot(body: object, *, now: float, max_age: int = 30) -> dict:
     clean = {}
     for key in REPORT_KEYS:
         report = reports.get(key)
+        if key == "flow" and key not in reports:
+            clean[key] = {"text": FLOW_UNCONFIGURED, "status": "unconfigured"}
+            continue
         if not isinstance(report, dict):
             raise GatewayError("invalid_response")
         status, text = report.get("status"), report.get("text")
         if (
-            status not in STATUSES or not isinstance(text, str)
-            or not 0 < len(text.strip()) <= 1200
-            or any(ord(char) < 32 and char not in "\n\t\r" for char in text)
+            not isinstance(status, str) or status not in STATUSES or not _valid_text(text)
             or status == "fresh" and not body["mqtt_connected"]
         ):
             raise GatewayError("invalid_response")
         clean[key] = {"text": text.strip(), "status": status}
+        brief = report.get("brief_text")
+        if key == "status" and _valid_text(brief):
+            clean[key]["brief_text"] = brief.strip()
+    for metric_key, (report_key, _, _, _) in METRICS.items():
+        if report_key == "flow" and "flow" not in reports:
+            continue
+        metric = optional_metric(metrics.get(metric_key), metric_key,
+                                 report_status=None if report_key == "flow" else clean[report_key]["status"])
+        if metric is not None and metric["status"] == "fresh" and not body["mqtt_connected"]:
+            metric = None
+        if metric is not None:
+            clean[report_key].setdefault("metrics", {})[metric_key] = metric
     return {"generated_at": generated, "reports": clean}
 
 
-def fetch_snapshot(config, *, opener=None, now=time.time) -> dict:
+def _transient_transport(error) -> bool:
+    reason = error.reason if isinstance(error, URLError) else error
+    # TLS verification and permanent DNS/address failures are never retried.
+    return (isinstance(reason, (TimeoutError, ConnectionResetError, ConnectionAbortedError))
+            or isinstance(reason, socket.gaierror) and reason.errno == socket.EAI_AGAIN
+            or isinstance(reason, OSError) and not isinstance(reason, ssl.SSLError)
+            and reason.errno in {errno.ECONNRESET, errno.ECONNABORTED, errno.ETIMEDOUT})
+
+
+def fetch_snapshot(config, *, opener=None, now=time.time, clock=time.monotonic,
+                   deadline_seconds=12) -> dict:
+    """Retry one classified transient GET within the original deadline; never cache."""
     headers = {
         "Authorization": "Bearer " + config.igw_token,
-        "Accept": "application/json",
-        "Cache-Control": "no-cache, no-store",
+        "Accept": "application/json", "Cache-Control": "no-cache, no-store",
         "User-Agent": "IGWCast/1.0",
     }
     if config.cf_client_id:
@@ -70,25 +132,36 @@ def fetch_snapshot(config, *, opener=None, now=time.time) -> dict:
         headers["CF-Access-Client-Secret"] = config.cf_client_secret
     request = Request(config.igw_url, headers=headers)
     transport = opener or build_opener(ProxyHandler({}), NoRedirects())
-    try:
-        with transport.open(request, timeout=10) as response:
-            if response.status != 200:
-                raise GatewayError("http_failure")
-            if response.headers.get_content_type() != "application/json":
-                raise GatewayError("invalid_response")
-            raw = response.read(MAX_BODY + 1)
-            if len(raw) > MAX_BODY:
-                raise GatewayError("invalid_response")
-            return validate_snapshot(json.loads(raw), now=now(), max_age=config.max_age)
-    except GatewayError:
-        raise
-    except HTTPError as exc:
-        exc.close()
-        raise GatewayError("http_failure") from None
-    except (URLError, TimeoutError, OSError):
-        raise GatewayError("transport_failure") from None
-    except (ValueError, UnicodeError):
-        raise GatewayError("invalid_response") from None
+    deadline = clock() + deadline_seconds
+    for attempt in range(2):
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise GatewayError("transport_failure")
+        try:
+            with transport.open(request, timeout=min(5, remaining)) as response:
+                if response.status != 200:
+                    if response.status in {502, 503, 504} and attempt == 0:
+                        continue
+                    raise GatewayError("http_failure")
+                if response.headers.get_content_type() != "application/json":
+                    raise GatewayError("invalid_response")
+                raw = response.read(MAX_BODY + 1)
+                if len(raw) > MAX_BODY:
+                    raise GatewayError("invalid_response")
+                return validate_snapshot(json.loads(raw), now=now(), max_age=config.max_age)
+        except GatewayError:
+            raise
+        except HTTPError as exc:
+            retry = exc.code in {502, 503, 504} and attempt == 0
+            exc.close()
+            if not retry:
+                raise GatewayError("http_failure") from None
+        except (URLError, TimeoutError, OSError) as exc:
+            if attempt != 0 or not _transient_transport(exc):
+                raise GatewayError("transport_failure") from None
+        except (ValueError, UnicodeError):
+            raise GatewayError("invalid_response") from None
+    raise GatewayError("transport_failure")
 
 
 def _fetch_worker(connection, config):

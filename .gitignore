@@ -15,3 +15,7 @@ secrets.yaml
 !.env.example
 *.mp4
 *.wav
+
+# Local voice model artifacts are operator-managed, never repository assets.
+*.onnx
+*.onnx.json

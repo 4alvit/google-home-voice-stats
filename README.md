@@ -30,6 +30,56 @@ can expose the scripts as momentary on/off devices; Google-to-HA cloud account
 linking can expose them as scenes. Ordinary device control remains available
 independently of this read-only adapter.
 
+```mermaid
+flowchart LR
+  Cerbo["Cerbo GX / Venus OS"] -->|"MQTT"| IGW["IGW: metrics, freshness and wording"]
+  IGW -->|"Scoped read-only API"| Service["NAS Cast service"]
+  Voice["Google voice"] --> Bridge["Matter hub and bridge"]
+  Bridge --> HA["HA report wrapper"]
+  HA -->|"Local playback token"| Service
+  Service --> Render["Numeric cards and local speech"]
+  Render -->|"Temporary MP4 over LAN"| Display["Configured display"]
+```
+
+See [architecture.md](architecture.md) for the complete data path, alternative
+HA speech mode, credentials, playback lifecycle, optional automations and rollback.
+
+## Voice and screen experience
+
+- Default status speech uses IGW's optional brief overview, with the original
+  detailed wording as a fallback. Full warning explanations remain on screen.
+- Large battery, solar and daily-generation values include units, status and
+  gateway receipt age. This age describes arrival at IGW, not physical sampling time.
+- Optional local **Piper** speech uses an installed voice model on the NAS, with
+  bounded execution and an eSpeak fallback. It adds no mandatory cloud speech
+  subscription. Check the software/model licenses and benchmark your host first.
+- Optional **power flow** adds a sixth report after IGW sources are configured.
+  Use `--include-flow` when rendering either HA adapter; default entity IDs and
+  the original five-report exposure remain unchanged.
+- One classified transient gateway read retry stays inside the existing deadline.
+  Concurrent reports still return busy instead of starting overlapping playback.
+- Optional [notification and scheduled-briefing blueprints](docs/automations.md)
+  provide explicit freshness guards, reserve recovery thresholds, episode latches
+  and allowed notification hours. Rendering templates does not enable them.
+
+```mermaid
+flowchart TD
+  Snapshot["Freshly fetched IGW envelope"] --> Speech["Brief status or requested report text"]
+  Snapshot --> Cards["Validated numbers, units and receipt ages"]
+  Speech --> Engine{"Configured local voice"}
+  Engine --> Espeak["eSpeak NG"]
+  Engine --> Piper["Optional Piper and local model"]
+  Piper -->|"Failure fallback"| Espeak
+  Espeak --> Video["Bounded H.264 / AAC snapshot"]
+  Piper --> Video
+  Cards --> Video
+  Video --> Receiver["Default Cast media receiver"]
+```
+
+See [standalone setup](docs/standalone-cast.md) for voice configuration and
+physical acceptance. All playback still targets the configured display;
+the snapshot is not an interactive or permanently pinned dashboard.
+
 <!-- ci-release-process:start -->
 ## CI and deployment
 

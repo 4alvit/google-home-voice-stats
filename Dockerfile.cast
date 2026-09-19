@@ -1,4 +1,5 @@
 FROM python:3.12-slim-bookworm
+ARG CAST_INSTALL_PIPER=false
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -8,6 +9,8 @@ WORKDIR /app
 COPY pyproject.toml README.md LICENSE ./
 COPY igw_google_voice ./igw_google_voice
 COPY blueprints ./blueprints
-RUN pip install '.[cast]' && useradd --uid 10001 --no-create-home cast
+RUN pip install '.[cast]' && \
+    if [ "$CAST_INSTALL_PIPER" = true ]; then pip install '.[piper]'; fi && \
+    useradd --uid 10001 --no-create-home cast
 USER 10001:10001
 CMD ["igw-cast"]
