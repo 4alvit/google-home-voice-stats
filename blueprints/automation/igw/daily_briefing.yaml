@@ -1,0 +1,37 @@
+blueprint:
+  name: Home Energy scheduled briefing
+  description: Run an existing report script at a chosen local time and on chosen weekdays. Playback uses that script's configured output device.
+  domain: automation
+  input:
+    report_script:
+      name: Report script
+      description: Select a public report wrapper, not the parameterized private dispatcher.
+      selector:
+        entity:
+          domain: script
+    briefing_time:
+      name: Briefing time
+      default: "08:00:00"
+      selector:
+        time: {}
+    weekdays:
+      name: Weekdays
+      default: [mon, tue, wed, thu, fri, sat, sun]
+      selector:
+        select:
+          multiple: true
+          options: [mon, tue, wed, thu, fri, sat, sun]
+mode: single
+max_exceeded: silent
+trace:
+  stored_traces: 0
+triggers:
+  - trigger: time
+    at: !input briefing_time
+conditions:
+  - condition: time
+    weekday: !input weekdays
+actions:
+  - action: script.turn_on
+    target:
+      entity_id: !input report_script

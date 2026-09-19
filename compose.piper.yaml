@@ -1,0 +1,18 @@
+# Optional local neural voice. Use together with compose.cast.yaml.
+services:
+  igw-cast:
+    build:
+      args:
+        CAST_INSTALL_PIPER: "true"
+    environment:
+      CAST_TTS_PROVIDER: piper
+      CAST_PIPER_MODEL: /voices/voice.onnx
+    volumes:
+      - type: bind
+        source: ${CAST_PIPER_VOICE_DIR:?Set the directory containing voice.onnx and voice.onnx.json}
+        target: /voices
+        read_only: true
+        bind:
+          create_host_path: false
+    # A deployment ceiling, not a claim about measured usage on your NAS.
+    mem_limit: 1g

@@ -131,7 +131,7 @@ class CastProcessTests(unittest.TestCase):
             return "mock-espeak-ng" if name == "espeak-ng" else actual_which(name)
 
         def synthesize(text, path, executable):
-            self.assertEqual(text, reports()["status"]["text"])
+            self.assertEqual(text, "Short central summary with warnings.")
             write_silence(path)
             return 0.2
 
@@ -139,7 +139,9 @@ class CastProcessTests(unittest.TestCase):
             output = Path(temporary) / "report.mp4"
             with patch.object(cast_media.shutil, "which", side_effect=find_tool), \
                  patch.object(cast_media, "_synthesize_speech", side_effect=synthesize):
-                result = cast_media.render_report_video("status", reports(), output)
+                data = reports()
+                data["status"]["brief_text"] = "Short central summary with warnings."
+                result = cast_media.render_report_video("status", data, output)
             probe = subprocess.run([actual_which("ffprobe"), "-v", "error", "-show_streams",
                                     "-show_format", "-of", "json", str(output)],
                                    capture_output=True, check=True, timeout=15)

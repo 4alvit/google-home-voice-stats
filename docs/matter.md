@@ -151,3 +151,20 @@ or restore the previous filter. Keep unrelated endpoints, bridge identity and
 fabrics intact. A dispatcher exclusion may remain as a safety measure unless it
 conflicts with your original policy. No HA script deletion, Cast service removal,
 Google account unlinking or bridge factory reset is needed to undo this exposure.
+
+## Optional energy flow endpoint
+
+Both configuration generators accept `--include-flow`. The default still creates
+five public report scripts. Opting in adds `script.igw_google_flow` with the alias
+`Energy flow report`; it does not change existing entity IDs or bridge identity.
+Configure the corresponding IGW flow sources first, validate and reload the HA
+package, then append that one exact entity ID to the existing bridge include
+filter. Preserve all existing endpoints, fabrics, credentials and mappings. Never
+expose `script.igw_google_energy_dispatch` or recreate/re-pair the bridge just to
+add this script.
+
+After Google discovers the added endpoint, use **"Hey Google, turn on Energy flow
+report"** and verify the Cast service result plus the physical display. An older
+IGW without the optional flow report responds that flow is not configured. This
+addition reports consumption and signed grid/battery power; it cannot control
+inverter settings. See [standalone flow semantics](standalone-cast.md#optional-flow-report).

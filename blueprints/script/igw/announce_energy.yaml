@@ -4,7 +4,7 @@ blueprint:
     Fetch an authenticated IGW report when called and speak its text on a selected
     Nest speaker. Install rest_command.igw_energy_report using the renderer first.
     IGW owns measurements, freshness, and report wording. This adapter does not
-    calculate energy statistics. Keep this dispatcher private; expose the five
+    calculate energy statistics. Keep this dispatcher private; expose only the
     generated wrapper scripts to Google Assistant instead.
   domain: script
   homeassistant:
@@ -56,6 +56,7 @@ fields:
           - solar_today
           - status
           - alarms
+          - flow
 variables:
   nest_player: !input media_player
   maximum_age: !input max_response_age
@@ -73,6 +74,9 @@ sequence:
         {%- set body = response.get('content') if response is mapping else none -%}
         {%- set reports = body.get('reports') if body is mapping else none -%}
         {%- set report = reports.get(selected_report) if reports is mapping and selected_report is string else none -%}
+        {%- if selected_report == 'flow' and reports is mapping and 'flow' not in reports -%}
+          {%- set report = {'status': 'unconfigured', 'text': 'Energy flow is not configured. Ask the gateway administrator to configure flow measurements.'} -%}
+        {%- endif -%}
         {%- set generated = body.get('generated_at') if body is mapping else none -%}
         {%- set metrics = body.get('metrics') if body is mapping else none -%}
         {%- if response is mapping
@@ -85,13 +89,18 @@ sequence:
           and -5 <= as_timestamp(now()) - generated <= maximum_age | float
           and metrics is mapping
           and 'battery_soc' in metrics and 'solar_power' in metrics and 'solar_today' in metrics
-          and selected_report in ['battery', 'solar', 'solar_today', 'status', 'alarms']
+          and selected_report in ['battery', 'solar', 'solar_today', 'status', 'alarms', 'flow']
           and report is mapping
           and report.get('status') in ['fresh', 'stale', 'unavailable', 'unconfigured']
           and (report.get('status') != 'fresh' or body.get('mqtt_connected') == true)
           and report.get('text') is string
           and 0 < report.get('text') | trim | length <= 1200 -%}
-          {{- report.get('text') | trim -}}
+          {%- set brief = report.get('brief_text') -%}
+          {%- if selected_report == 'status' and brief is string and 0 < brief | trim | length <= 1200 -%}
+            {{- brief | trim -}}
+          {%- else -%}
+            {{- report.get('text') | trim -}}
+          {%- endif -%}
         {%- else -%}
           {{- fallback -}}
         {%- endif -%}

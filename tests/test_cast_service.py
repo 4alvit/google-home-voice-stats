@@ -70,7 +70,8 @@ class TestGateway(unittest.TestCase):
         for report in body["reports"].values():
             report.update(status="unavailable", text="Measurements are unavailable.")
         parsed = validate_snapshot(body, now=time.time())
-        self.assertEqual(parsed["reports"], body["reports"])
+        self.assertEqual({key: parsed["reports"][key] for key in body["reports"]}, body["reports"])
+        self.assertEqual(parsed["reports"]["flow"]["status"], "unconfigured")
         self.assertNotIn("metrics", parsed)
 
     def test_stale_envelope_and_contradictory_fresh_reports_rejected(self):
@@ -201,7 +202,11 @@ class TestServer(unittest.TestCase):
         self.assertEqual(self.request("POST", "/v1/reports/anything", auth=True)[0], 404)
         self.assertEqual(self.request("POST", "/v1/reports/status", auth=True, body=b"{}")[0], 400)
         self.launch()
+        current_url = self.captured["url"]
         self.assertEqual(self.request("POST", "/v1/reports/battery", auth=True)[0], 409)
+        self.assertEqual(self.request("POST", "/v1/reports/status", auth=True)[0], 409)
+        self.assertEqual(self.captured["url"], current_url)
+        self.assertFalse(self.engine.stop.is_set())
         self.assertEqual(self.request("GET", "/v1/status")[0], 401)
         self.assertEqual(json.loads(self.request("GET", "/v1/status", auth=True)[2])["state"], "running")
 

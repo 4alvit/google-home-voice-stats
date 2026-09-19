@@ -13,9 +13,18 @@ IGW remains responsible for measurements, units, freshness and report wording.
 
 The status report shows battery, solar power, today's solar energy and alarms.
 Individual reports show one larger card. Every card retains IGW's freshness
-status. The selected report's text is spoken by local eSpeak NG; this basic offline
-voice differs from Google's cloud TTS voice. Long text continues across pages
-instead of hiding an unavailable/stale warning.
+status. Validated numeric measurements add large battery charge, solar power and
+today's generation values. Missing or invalid optional numbers stay absent, and
+stale/unavailable values never become zero or a current measurement. The gateway
+receipt age is shown when supplied; it is not sensor measurement time or the
+`generated_at` envelope timestamp. Age labels are fixed for this video snapshot.
+
+Status speech uses IGW's optional `reports.status.brief_text`; older gateways fall
+back to the full `text`. Other reports speak the full central text. The screen
+continues to show the full report wording and paginates long warnings. eSpeak NG
+is the default offline voice; [optional local Piper](local-speech.md) adds a neural
+voice with bounded synthesis and eSpeak fallback. Neither voice uses Google's
+cloud TTS service.
 
 The output is a 1280×720 H.264/AAC MP4 snapshot, not a live or interactive dashboard.
 It remains visible through the speech and a short reading interval, then normal
@@ -93,7 +102,7 @@ curl --fail-with-body --request POST \
 ```
 
 No request body is accepted. Supported paths end in `battery`, `solar`,
-`solar_today`, `status` or `alarms`. `202` means the request was accepted for
+`solar_today`, `status`, `alarms` or `flow`. `202` means the request was accepted for
 processing, not that playback succeeded. `409` means a report is already running;
 wait instead of repeatedly interrupting the display.
 
@@ -105,6 +114,9 @@ URLs, device IDs, credentials or report text. `GET /healthz` checks that the ser
 is responding; it does not check IGW, the network or the display.
 
 Gateway fetches have a total 12-second deadline, including stuck DNS or slow reads.
+One retry is allowed for HTTP 502/503/504, temporary DNS failure, a timeout or a
+reset connection, within that same deadline. Authentication/authorization,
+redirects, TLS verification, rate limits and invalid JSON are never retried.
 Old envelopes and contradictory fresh/disconnected reports are rejected. A gateway
 failure produces an unavailable message instead of zero measurements. Rendering
 and playback are bounded, and only one report is processed at a time.
@@ -113,6 +125,27 @@ Media URLs contain random, short-lived access capabilities because Cast cannot
 attach the API authorization header. They expire after three minutes. Paths are
 not logged; temporary files are removed on expiry and container removal. Do not
 share a media URL. The service supports HEAD and byte ranges for Cast playback.
+
+## Optional flow report
+
+`POST /v1/reports/flow` speaks the authoritative IGW flow report and shows the
+configured consumption, grid and battery power alongside the full report text.
+The IGW contract defines positive grid power as import and negative as export;
+positive battery power means charging and negative means discharging. This is
+read-only reporting, not inverter control. Configure the exact sources centrally
+in IGW; the adapter does not guess meters, infer whole-home coverage or reconstruct
+flows by subtracting unrelated measurements.
+
+An older IGW response without `reports.flow` produces a useful "not configured"
+report. Existing battery/solar/status reports continue to work. Missing flow
+measurements stay absent, not zero. To add a sixth public script deliberately,
+pass `--include-flow` to `igw-cast-ha` (or to the original
+`igw-google-voice render-config` generator), then expose only
+`script.igw_google_flow` in addition to the existing five scripts. Default generated
+configuration keeps the existing scripts and Matter endpoint identities unchanged.
+Preserve your HA entity-name override such as `Energy`. Say "Hey Google, turn on
+Energy flow report" through Matter, or use the equivalent cloud scene command.
+Adding the script alone does not configure IGW sources or establish Google routing.
 
 ## Optional existing Google voice commands
 

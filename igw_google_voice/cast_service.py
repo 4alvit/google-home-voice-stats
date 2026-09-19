@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import logging
@@ -79,7 +80,8 @@ class ReportEngine:
     def __init__(self, config, *, fetcher=fetch_snapshot_bounded, renderer=None, player=None, clock=time.monotonic):
         if renderer is None:
             from .cast_media import render_report_video
-            renderer = render_report_video
+            renderer = partial(render_report_video, tts_provider=config.tts_provider,
+                               piper_model=config.piper_model, piper_timeout=config.piper_timeout)
         self.config, self.fetcher, self.renderer = config, fetcher, renderer
         self.player = player or CastPlayback(config)
         self.clock = clock

@@ -32,3 +32,15 @@ The repository does not create Google account settings or routines on your behal
 
 All five paths read IGW. They never change charge settings, loads, relays,
 thermostats, or inverter configuration.
+
+## Optional flow report
+
+After generating the HA package with `--include-flow`, configuring IGW flow
+sources, and exposing `script.igw_google_flow` through the existing route:
+
+- Matter: "Hey Google, turn on Energy flow report."
+- Cloud scene: "Hey Google, activate Energy flow report."
+
+The response explains configured consumption, grid import/export, and battery
+charging/discharging. The default five scripts stay unchanged. A bare phrase
+still requires your own Routine; this is not a conversational Google Action.

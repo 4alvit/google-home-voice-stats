@@ -21,6 +21,17 @@ REPORTS = {
 }
 SCRIPT_IDS = {key: f"igw_google_{key}" for key in REPORTS}
 SCRIPT_IDS["alarms"] = "igw_announce_alarms"
+OPTIONAL_REPORTS = {"flow": "Energy flow report"}
+
+
+def report_definitions(include_flow=False):
+    return REPORTS | OPTIONAL_REPORTS if include_flow else dict(REPORTS)
+
+
+def script_id(key):
+    return SCRIPT_IDS.get(key, f"igw_google_{key}")
+
+
 BLUEPRINT_RELATIVE_PATH = Path("blueprints/script/igw/announce_energy.yaml")
 
 
@@ -95,7 +106,7 @@ def blueprint_source() -> Path:
     raise ValueError("Blueprint asset is missing; use a complete checkout or reinstall the package.")
 
 
-def render_package(tts_entity: str, media_player: str, max_age: int) -> str:
+def render_package(tts_entity: str, media_player: str, max_age: int, *, include_flow: bool = False) -> str:
     validate_entity(tts_entity, "tts")
     validate_entity(media_player, "media_player")
     if isinstance(max_age, bool) or not 5 <= max_age <= 300:
@@ -131,10 +142,10 @@ def render_package(tts_entity: str, media_player: str, max_age: int) -> str:
         f"        media_player: {json.dumps(media_player)}",
         f"        max_response_age: {max_age}",
     ])
-    for key, name in REPORTS.items():
+    for key, name in report_definitions(include_flow).items():
         lines.extend([
             "",
-            f"  {SCRIPT_IDS[key]}:",
+            f"  {script_id(key)}:",
             f"    alias: {json.dumps(name)}",
             '    icon: "mdi:account-voice"',
             "    mode: queued",
@@ -150,9 +161,10 @@ def render_package(tts_entity: str, media_player: str, max_age: int) -> str:
 
 
 def render_files(*, igw_url: str, tts_entity: str, media_player: str,
-                 allow_local_http: bool = False, max_age: int = 30) -> dict[Path, str]:
+                 allow_local_http: bool = False, max_age: int = 30,
+                 include_flow: bool = False) -> dict[Path, str]:
     validate_url(igw_url, allow_local_http=allow_local_http)
-    package = render_package(tts_entity, media_player, max_age)
+    package = render_package(tts_entity, media_player, max_age, include_flow=include_flow)
     secrets = (
         "# Merge into HA secrets.yaml, which must remain outside version control.\n"
         "# This is an example, not a usable credential file.\n"
@@ -181,6 +193,8 @@ def render_files(*, igw_url: str, tts_entity: str, media_player: str,
             "   a paired Matter Hub bridge (docs/matter.md) or cloud scene account linking.\n"
             "   Say 'turn on Energy status report' for Matter, or 'activate Energy status\n"
             "   report' for cloud scenes, after the Hey Google wake phrase.\n\n"
+            + ("Optional flow report included: expose script.igw_google_flow separately only\n"
+             "after configuring IGW flow sources. Preserve existing Matter endpoints.\n\n" if include_flow else "") +
             "See the repository README and docs/routines.md for validation and Google setup.\n"
         ),
     }
@@ -220,19 +234,20 @@ def main(argv: list[str] | None = None) -> int:
     render.add_argument("--media-player", required=True, help="Existing HA Google Cast media_player entity ID.")
     render.add_argument("--allow-local-http", action="store_true", help="Allow HTTP only for private IPs, localhost, or Kubernetes service DNS on a trusted network.")
     render.add_argument("--max-response-age", type=int, default=30)
+    render.add_argument("--include-flow", action="store_true", help="Add the opt-in energy flow script; preserve existing report scripts.")
     render.add_argument("--output", type=Path, required=True, help="New staging directory; never an active HA config directory.")
     args = parser.parse_args(argv)
     try:
         files = render_files(
             igw_url=args.igw_url, tts_entity=args.tts_entity, media_player=args.media_player,
-            allow_local_http=args.allow_local_http, max_age=args.max_response_age,
+            allow_local_http=args.allow_local_http, max_age=args.max_response_age, include_flow=args.include_flow,
         )
         write_files(args.output, files)
     except (ValueError, OSError) as exc:
         # Validation messages never interpolate inputs, URLs, credentials, or file contents.
         message = str(exc) if isinstance(exc, ValueError) else "Could not write output files; check the destination and permissions."
         parser.exit(2, f"Configuration error: {message}\n")
-    print("Rendered five report scripts, shared blueprint, and a credential example. Read INSTALL.md before installation.")
+    print("Rendered report scripts, shared blueprint, and a credential example. Read INSTALL.md before installation.")
     return 0
 
 

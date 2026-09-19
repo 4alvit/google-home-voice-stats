@@ -14,10 +14,14 @@ if [[ "$mode" == config || "$mode" == all ]]; then
   stage=$(mktemp -d)
   trap 'rm -rf "$stage"' EXIT
   for adapter in tts cast; do
-    python3 tests/make_ha_fixture.py --adapter "$adapter" "$stage/$adapter-check"
-    docker run --rm --entrypoint python \
-      -v "$stage/$adapter-check:/config" \
-      ghcr.io/home-assistant/home-assistant:2026.9.2 \
-      -m homeassistant --script check_config --config /config
+    for reports in default flow; do
+      flow_args=()
+      if [[ "$reports" == flow ]]; then flow_args=(--include-flow); fi
+      python3 tests/make_ha_fixture.py --adapter "$adapter" "${flow_args[@]}" "$stage/$adapter-$reports-check"
+      docker run --rm --entrypoint python \
+        -v "$stage/$adapter-$reports-check:/config" \
+        ghcr.io/home-assistant/home-assistant:2026.9.2 \
+        -m homeassistant --script check_config --config /config
+    done
   done
 fi

@@ -1,0 +1,120 @@
+blueprint:
+  name: Home Energy condition and recovery notifications
+  description: >-
+    Notify once for an explicitly selected energy condition and once when it
+    clears. For grid loss, use a verified grid-loss binary sensor; zero import
+    power does not establish grid loss. No equipment is controlled.
+  domain: automation
+  input:
+    condition_sensor:
+      name: Condition sensor
+      description: On means the condition is active; off means it has cleared.
+      selector:
+        entity:
+          domain: binary_sensor
+    freshness_sensor:
+      name: Condition data freshness
+      description: Must be on only while the selected condition is known and current.
+      selector:
+        entity:
+          domain: binary_sensor
+    episode_helper:
+      name: Condition notification latch
+      description: A dedicated input_boolean with no fixed initial value. Do not reuse the battery latch.
+      selector:
+        entity:
+          domain: input_boolean
+    active_message:
+      name: Condition message
+      default: The monitored energy condition is active.
+      selector:
+        text: {}
+    recovery_message:
+      name: Recovery message
+      default: The monitored energy condition has cleared.
+      selector:
+        text: {}
+    stable_minutes:
+      name: State must persist for
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: min
+          mode: box
+    window_start:
+      name: Notifications allowed from
+      default: "08:00:00"
+      selector:
+        time: {}
+    window_end:
+      name: Notifications allowed until
+      default: "22:00:00"
+      selector:
+        time: {}
+    notification_service:
+      name: Notification service
+      description: Select persistent_notification.create or an existing notify service that accepts title and message, such as notify.mobile_app_your_phone.
+      default: persistent_notification.create
+      selector:
+        text: {}
+
+mode: single
+max_exceeded: silent
+trace:
+  stored_traces: 0
+trigger_variables:
+  condition_entity: !input condition_sensor
+  fresh_entity: !input freshness_sensor
+variables:
+  condition_entity: !input condition_sensor
+  fresh_entity: !input freshness_sensor
+  latch_entity: !input episode_helper
+  notification_service: !input notification_service
+triggers:
+  - trigger: template
+    value_template: "{{ is_state(fresh_entity, 'on') and is_state(condition_entity, 'on') }}"
+    for:
+      minutes: !input stable_minutes
+  - trigger: template
+    value_template: "{{ is_state(fresh_entity, 'on') and is_state(condition_entity, 'off') }}"
+    for:
+      minutes: !input stable_minutes
+  - trigger: time
+    at: !input window_start
+conditions:
+  - condition: time
+    after: !input window_start
+    before: !input window_end
+  - condition: template
+    value_template: >-
+      {{ is_state(fresh_entity, 'on')
+         and states(condition_entity) in ['on', 'off']
+         and notification_service is string and notification_service | trim == notification_service
+         and notification_service is match('^(persistent_notification[.]create|notify[.][a-z0-9_]+)$')
+         and states(latch_entity) in ['on', 'off'] }}
+actions:
+  - choose:
+      - conditions: "{{ is_state(condition_entity, 'on') and is_state(latch_entity, 'off') }}"
+        sequence:
+          - variables:
+              energy_notification_message: !input active_message
+          - action: "{{ notification_service }}"
+            data:
+              title: Home Energy
+              message: "{{ energy_notification_message }}"
+          - action: input_boolean.turn_on
+            target:
+              entity_id: !input episode_helper
+      - conditions: "{{ is_state(condition_entity, 'off') and is_state(latch_entity, 'on') }}"
+        sequence:
+          - variables:
+              energy_notification_message: !input recovery_message
+          - action: "{{ notification_service }}"
+            data:
+              title: Home Energy
+              message: "{{ energy_notification_message }}"
+          - action: input_boolean.turn_off
+            target:
+              entity_id: !input episode_helper

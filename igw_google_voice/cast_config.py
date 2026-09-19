@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import ipaddress
 import os
+from pathlib import Path
 from urllib.parse import urlsplit
 from uuid import UUID
 
@@ -24,6 +25,10 @@ class CastConfig:
     max_age: int = 30
     cf_client_id: str = field(default="", repr=False)
     cf_client_secret: str = field(default="", repr=False)
+
+    tts_provider: str = "espeak"
+    piper_model: str = field(default="", repr=False)
+    piper_timeout: int = 10
 
     @classmethod
     def from_env(cls, env=None):
@@ -65,7 +70,15 @@ class CastConfig:
                 raise ValueError()
             if any(c.isspace() for c in client_id + client_secret):
                 raise ValueError()
+            provider = env.get("CAST_TTS_PROVIDER", "espeak")
+            model = env.get("CAST_PIPER_MODEL", "")
+            timeout = int(env.get("CAST_PIPER_TIMEOUT", "10"))
+            if provider not in {"espeak", "piper"} or not 1 <= timeout <= 20:
+                raise ValueError()
+            if provider == "piper" and (not Path(model).is_absolute() or not model.endswith(".onnx")
+                                        or any(ord(c) < 32 for c in model)):
+                raise ValueError()
             return cls(url, token, api_token, host, UUID(required("CAST_UUID")), media_url,
-                       bind, port, age, client_id, client_secret)
+                       bind, port, age, client_id, client_secret, provider, model, timeout)
         except (ValueError, TypeError):
             raise ValueError("Missing or invalid service configuration; see the standalone Cast guide.") from None

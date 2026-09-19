@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cast
+      args:
+        CAST_INSTALL_PIPER: "${CAST_INSTALL_PIPER:-false}"
     image: igw-cast:local
     restart: unless-stopped
     # Linux host networking reaches the fixed Cast device on the home LAN.
