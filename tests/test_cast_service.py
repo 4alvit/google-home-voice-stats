@@ -17,7 +17,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 from igw_google_voice.cast_config import CastConfig
-from igw_google_voice.cast_gateway import GatewayError, fetch_snapshot, fetch_snapshot_bounded, validate_snapshot
+from igw_google_voice.cast_gateway import FALLBACK, GatewayError, fetch_snapshot, fetch_snapshot_bounded, validate_snapshot
 from igw_google_voice.cast_service import CastPlayback, CastServer, ReportEngine, silence_cast_logs
 
 
@@ -61,6 +61,20 @@ class TestConfig(unittest.TestCase):
         result = CastConfig.from_env(self.env | {
             "IGW_URL": "http://192.168.50.5/v1/energy", "IGW_ALLOW_LOCAL_HTTP": "true"})
         self.assertTrue(result.igw_url.startswith("http://"))
+
+    def test_rejects_piper_relative_model_port_mismatch_and_age_bounds(self):
+        cases = (
+            {"CAST_TTS_PROVIDER": "piper", "CAST_PIPER_MODEL": "model.onnx"},
+            {"CAST_TTS_PROVIDER": "piper", "CAST_PIPER_MODEL": "/tmp/model.txt"},
+            {"CAST_PORT": "8092"},
+            {"IGW_MAX_RESPONSE_AGE": "4"},
+            {"IGW_MAX_RESPONSE_AGE": "301"},
+            {"CAST_BIND_HOST": "::1"},
+        )
+        for changes in cases:
+            with self.subTest(changes=tuple(changes.items())):
+                with self.assertRaises(ValueError):
+                    CastConfig.from_env(self.env | changes)
 
 
 class TestGateway(unittest.TestCase):
@@ -232,6 +246,92 @@ class TestServer(unittest.TestCase):
             self.launch()
         self.assertNotIn("DO_NOT_LOG", "".join(logs.output))
         self.assertTrue(all(r["status"] == "unavailable" for r in self.captured["reports"].values()))
+
+    def _wait_idle(self):
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            snap = json.loads(self.request("GET", "/v1/status", auth=True)[2])
+            if snap["state"] == "idle":
+                return snap
+            time.sleep(0.05)
+        self.fail("engine did not return to idle")
+
+    def test_gateway_failure_recovers_idle_for_manual_retry(self):
+        """Only a later explicit request completes fresh playback after fallback."""
+        fetches, renders, playbacks = [], [], []
+        original_renderer, original_player = self.engine.renderer, self.engine.player
+
+        def fetch(_):
+            fetches.append(None)
+            if len(fetches) == 1:
+                raise GatewayError("transport_failure")
+            body = fixture()
+            body["reports"]["battery"]["text"] = "Fresh battery response."
+            return validate_snapshot(body, now=time.time(), max_age=config().max_age)
+
+        def render(key, reports, path):
+            renders.append((key, json.loads(json.dumps(reports))))
+            return original_renderer(key, reports, path)
+
+        def play(url, duration, stop):
+            playbacks.append(url)
+            return original_player.play(url, duration, stop)
+
+        self.engine.fetcher = fetch
+        self.engine.renderer = render
+        self.engine.player = SimpleNamespace(play=play)
+        self.assertEqual(self.request("POST", "/v1/reports/status", auth=True)[0], 202)
+        self.assertTrue(self.playing.wait(2))
+        self.assertEqual(renders[0][0], "status")
+        self.assertTrue(renders[0][1])
+        self.assertTrue(all(report["text"] == FALLBACK for report in renders[0][1].values()))
+        self.release.set()
+        self.assertEqual(self._wait_idle()["result"], "fallback_played")
+        self.assertFalse(self.engine.busy)
+        self.assertEqual((len(fetches), len(renders), len(playbacks)), (1, 1, 1))
+        self.playing.clear()
+        self.release.clear()
+        self.assertEqual(self.request("POST", "/v1/reports/battery", auth=True)[0], 202)
+        self.assertTrue(self.playing.wait(2))
+        self.assertEqual(renders[1][0], "battery")
+        self.assertEqual(renders[1][1]["battery"]["text"], "Fresh battery response.")
+        self.assertNotEqual(playbacks[0], playbacks[1])
+        self.release.set()
+        self.assertEqual(self._wait_idle()["result"], "report_played")
+        self.assertFalse(self.engine.busy)
+        self.assertEqual((len(fetches), len(renders), len(playbacks)), (2, 2, 2))
+
+    def test_fresh_snapshot_expiring_during_render_is_not_published(self):
+        """Rendering can exhaust a snapshot that passed gateway validation."""
+        generated = time.time()
+        current_time = [generated]
+        validated = []
+        original_renderer = self.engine.renderer
+
+        def fresh(_):
+            body = fixture()
+            body["generated_at"] = generated
+            snapshot = validate_snapshot(body, now=current_time[0], max_age=config().max_age)
+            validated.append(snapshot)
+            return snapshot
+
+        def render(key, reports, path):
+            result = original_renderer(key, reports, path)
+            current_time[0] += config().max_age + 1
+            return result
+
+        self.engine.fetcher = fresh
+        self.engine.renderer = render
+        # Replace only the engine module's time reference, leaving HTTP/test clocks real.
+        with patch("igw_google_voice.cast_service.time", SimpleNamespace(time=lambda: current_time[0])):
+            self.assertEqual(self.request("POST", "/v1/reports/status", auth=True)[0], 202)
+            self.assertEqual(self._wait_idle()["result"], "snapshot_expired")
+        self.assertEqual(len(validated), 1)
+        self.assertEqual(validated[0]["generated_at"], generated)
+        self.assertFalse(self.playing.is_set())
+        self.assertFalse(self.engine.busy)
+        self.assertEqual(list(self.engine.root.glob("*.mp4")), [])
+        self.assertEqual(self.engine.media, {})
 
     def test_handler_error_never_logs_client_identity(self):
         with self.assertLogs("igw_cast", level="WARNING") as logs:
