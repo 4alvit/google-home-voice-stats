@@ -389,3 +389,12 @@ verified scope and the remaining physical voice checks. A successful
 Cast action alone does not establish human audibility or Google microphone access.
 
 License: MIT.
+
+## Related projects
+
+- [Inverter Gateway](https://github.com/victron-venus/inverter-gateway) owns the
+  `/v1/energy` reports, freshness and wording consumed by this adapter.
+- [Amazon Echo Home Energy](https://github.com/4alvit/amazon-echo-home-voice)
+  provides a separate Alexa skill for the same energy-report contract.
+- [HA Homelab](https://github.com/ha-homelab) collects public integrations and
+  device guides; those projects have their own installation and hardware requirements.
