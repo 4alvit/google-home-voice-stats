@@ -2,10 +2,7 @@
   "repository": "4alvit/google-home-voice-stats",
   "mode": "validation-only",
   "default_branch": "main",
-  "validation_workflows": [
-    "validate.yml",
-    "test-adapter.yml"
-  ],
+  "validation_workflows": ["validate.yml", "test-adapter.yml", "codeql.yml", "dependency-review.yml"],
   "local_checks": [
     "bash scripts/ci.sh"
   ],
