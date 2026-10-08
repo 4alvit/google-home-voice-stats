@@ -2,13 +2,20 @@
   "repository": "4alvit/google-home-voice-stats",
   "mode": "validation-only",
   "default_branch": "main",
-  "validation_workflows": ["validate.yml", "test-adapter.yml", "codeql.yml", "dependency-review.yml"],
+  "validation_workflows": [
+    "validate.yml",
+    "test-adapter.yml",
+    "codeql.yml",
+    "dependency-review.yml",
+    "security.yml"
+  ],
   "local_checks": [
     "bash scripts/ci.sh"
   ],
   "notes": [
     "Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.",
-    "The callable/local adapter tests cover response handling and rendered Home Assistant configuration; config validation uses the existing HA 2026.9.2 container with offline fixtures. Install .[test], Docker, PyYAML and actionlint for the complete local check. No physical Nest speech or live IGW verification is implied."
+    "The callable/local adapter tests cover response handling and rendered Home Assistant configuration; config validation uses the existing HA 2026.9.2 container with offline fixtures. Install .[test], Docker, PyYAML and actionlint for the complete local check. No physical Nest speech or live IGW verification is implied.",
+    "Quality gate is the sole push/PR entry point; reusable test workflows do not duplicate event-triggered runs."
   ],
   "visibility": "public"
 }

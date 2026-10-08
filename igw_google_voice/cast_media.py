@@ -8,7 +8,8 @@ import sys
 import os
 from pathlib import Path
 import shutil
-import subprocess
+# Fixed local speech/video executables, invoked without a shell.
+import subprocess  # nosec B404
 import tempfile
 import wave
 
@@ -245,7 +246,8 @@ def _draw_page(report_key: str, overall_status: str, cards: list[_Card],
 
 def _run(command: list[str], *, input_bytes: bytes | None = None, timeout: int) -> None:
     try:
-        result = subprocess.run(command, input=input_bytes, stdout=subprocess.DEVNULL,
+        # Callers provide fixed commands; report text is passed on stdin.
+        result = subprocess.run(command, input=input_bytes, stdout=subprocess.DEVNULL,  # nosec B603
                                 stderr=subprocess.DEVNULL, check=False, timeout=timeout,
                                 env={"PATH": os.environ.get("PATH", os.defpath), "LANG": "C.UTF-8",
                                      "OMP_NUM_THREADS": "1", "OPENBLAS_NUM_THREADS": "1"})

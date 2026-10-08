@@ -398,3 +398,10 @@ License: MIT.
   provides a separate Alexa skill for the same energy-report contract.
 - [HA Homelab](https://github.com/ha-homelab) collects public integrations and
   device guides; those projects have their own installation and hardware requirements.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development, bug reports and proposals,
+[SECURITY.md](SECURITY.md) for confidential vulnerability reports and deployment
+boundaries, and the [OpenSSF evidence index](docs/openssf-evidence.md) for assessment
+scope and verification.
