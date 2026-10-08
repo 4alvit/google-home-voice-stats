@@ -23,8 +23,35 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng fonts-dejavu-core
-          python3 -m pip install '.[test,cast]'
+          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-build.txt -r requirements-test.lock
+          python3 -m pip install --no-deps --no-build-isolation '.[test,cast]'
       - name: Test response handling and rendered HA configuration
         run: bash scripts/ci.sh unit
       - name: Validate with Home Assistant 2026.9.2
         run: bash scripts/ci.sh config
+  container:
+    name: Locked Cast image (Piper ${{ matrix.piper }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        piper: ['false', 'true']
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@351661ca32ac09a36dc5ee2d536e3128f2a3c8ed # v2.22.0
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Build and check the locked runtime without contacting devices
+        env:
+          INSTALL_PIPER: ${{ matrix.piper }}
+        run: |
+          docker build -f Dockerfile.cast --build-arg "CAST_INSTALL_PIPER=$INSTALL_PIPER" --tag igw-cast-check .
+          docker run --rm --entrypoint python igw-cast-check -m pip check
+          docker run --rm --entrypoint python igw-cast-check -c 'import pychromecast, PIL, igw_google_voice.cast_service'
+          if [ "$INSTALL_PIPER" = true ]; then
+            docker run --rm --entrypoint python igw-cast-check -c 'import piper'
+          fi

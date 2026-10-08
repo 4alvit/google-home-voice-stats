@@ -7,3 +7,9 @@
 !blueprints/
 !blueprints/**
 **/__pycache__
+
+# Locked dependencies are part of the image build input.
+!.github/
+!.github/requirements-build.txt
+!requirements-cast.lock
+!requirements-piper.lock
