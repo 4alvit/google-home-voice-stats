@@ -41,3 +41,12 @@ This repository uses validation-only CI. Its manual source releases identify val
 - [`docs/standalone-cast.md`](docs/standalone-cast.md)
 
 See the [OpenSSF evidence index](docs/openssf-evidence.md) for the current assessment scope and outstanding verification.
+
+## FLOSS static analysis
+
+Install hash-verified analysis dependencies with
+`python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-security.txt`,
+then run `python3 scripts/security_check.py`. The required quality gate runs the
+same Ruff and Bandit checks. Scanner failures, empty/incomplete reports and
+findings fail the gate. Any narrowly scoped exception must have an explanatory
+source comment and a reviewer must verify that it is not an exploitable finding.

@@ -20,7 +20,7 @@ class CastConfig:
     cast_host: str = field(repr=False)
     cast_uuid: UUID = field(repr=False)
     media_base_url: str = field(repr=False)
-    bind_host: str = field(default="0.0.0.0", repr=False)
+    bind_host: str = field(default="127.0.0.1", repr=False)
     port: int = 8091
     max_age: int = 30
     cf_client_id: str = field(default="", repr=False)
