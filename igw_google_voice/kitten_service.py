@@ -7,6 +7,8 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import signal
+import sys
 from pathlib import Path
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -216,6 +218,8 @@ class SpeechHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    # A container PID 1 must install an explicit termination handler.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     token = Path(os.environ["KITTEN_TOKEN_FILE"]).read_text().strip()
     if len(token) < 32 or any(c.isspace() for c in token):
         raise SystemExit("Invalid speech service token")
