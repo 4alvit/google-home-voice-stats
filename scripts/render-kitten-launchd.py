@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a loopback-only native macOS Nano service for encrypted SSH forwarding."""
+"""Render an unprivileged HTTPS Nano service with an explicit private or loopback bind."""
 import argparse
 import ipaddress
 from pathlib import Path
@@ -11,12 +11,13 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--root', type=Path, required=True)
 parser.add_argument('--user', required=True)
 parser.add_argument('--address', default='127.0.0.1',
-                    help='IPv4 loopback only; NAS access requires an SSH tunnel')
+                    help='Private IPv4 or loopback; must match the TLS certificate SAN')
 parser.add_argument('--threads', type=int, choices=range(1, 5), default=4)
 args = parser.parse_args()
 address = ipaddress.ip_address(args.address)
-if address.version != 4 or not address.is_loopback:
-    parser.error('Use an IPv4 loopback address; NAS access requires an encrypted SSH tunnel')
+if (address.version != 4 or not address.is_private
+        or address.is_unspecified or address.is_multicast):
+    parser.error('Use a private IPv4 or loopback address matching the TLS certificate SAN')
 if not args.root.is_absolute() or any(ord(c) < 32 for c in str(args.root)):
     parser.error('The runtime root must be an absolute path')
 if args.user == 'root' or not re.fullmatch(r'[a-z_][a-z0-9_-]{0,63}', args.user):

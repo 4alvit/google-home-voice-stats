@@ -11,7 +11,6 @@ import time
 import subprocess
 import sys
 from pathlib import Path
-import plistlib
 import tempfile
 import threading
 import unittest
@@ -84,11 +83,12 @@ class KittenConfigTests(unittest.TestCase):
         self.assertEqual(env['KITTEN_TLS_KEY_FILE'], '/private/runtime/tls/server.key')
 
     def test_loopback_tunnel_primary_is_accepted(self):
-        endpoints = ('http://127.0.0.1:18092/v1/speech',
-                     'http://192.168.50.12:8092/v1/speech')
+        endpoints = ('https://127.0.0.1:18092/v1/speech',
+                     'https://192.168.50.12:8092/v1/speech')
         config = CastConfig.from_env(self.env | {
             'CAST_TTS_PROVIDER': 'kitten', 'CAST_KITTEN_TOKEN': 'k' * 40,
-            'CAST_KITTEN_ENDPOINTS': ','.join(endpoints)})
+            'CAST_KITTEN_ENDPOINTS': ','.join(endpoints),
+            'CAST_KITTEN_CA_FILE': '/run/speech-ca/ca.crt'})
         self.assertEqual(config.kitten_endpoints, endpoints)
 
 
@@ -99,22 +99,24 @@ class LaunchdTransportTests(unittest.TestCase):
             [sys.executable, str(script), '--root', '/tmp/igw-speech',
              '--user', 'speech', *arguments], capture_output=True, check=False)
 
-    def test_default_and_explicit_loopback_bind(self):
-        for arguments in ((), ('--address', '127.0.0.1')):
+    def test_default_loopback_and_explicit_private_bind(self):
+        for arguments, expected in (((), '127.0.0.1'), (('--address', '127.0.0.1'), '127.0.0.1'),
+                                    (('--address', '192.168.50.11'), '192.168.50.11'),
+                                    (('--address', '10.0.0.2'), '10.0.0.2')):
             with self.subTest(arguments=arguments):
                 result = self.render(*arguments)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 environment = plistlib.loads(result.stdout)['EnvironmentVariables']
-                self.assertEqual(environment['KITTEN_BIND_HOST'], '127.0.0.1')
+                self.assertEqual(environment['KITTEN_BIND_HOST'], expected)
+                self.assertIn('KITTEN_TLS_CERT_FILE', environment)
 
-    def test_non_loopback_binds_are_rejected(self):
-        for address in ('192.168.50.11', '10.0.0.2', '172.16.0.2',
-                        '0.0.0.0', '8.8.8.8', '::1'):
+    def test_public_unspecified_and_unsupported_binds_are_rejected(self):
+        for address in ('0.0.0.0', '8.8.8.8', '224.0.0.1', '::1'):
             with self.subTest(address=address):
                 result = self.render('--address', address)
                 self.assertEqual(result.returncode, 2)
                 self.assertEqual(result.stdout, b'')
-                self.assertIn(b'encrypted SSH tunnel', result.stderr)
+                self.assertIn(b'TLS certificate SAN', result.stderr)
 
 
 class FailoverTests(unittest.TestCase):
