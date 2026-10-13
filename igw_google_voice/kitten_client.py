@@ -15,7 +15,9 @@ def fetch_audio(endpoint, token, text):
     connection = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=2)
     try:
         connection.connect()
-        connection.sock.settimeout(7)
+        # The parent enforces the configured total budget (at most ten seconds).
+        # Allow a nine-second response for slower native hosts using that budget.
+        connection.sock.settimeout(9)
         connection.request("POST", parsed.path, json.dumps({"text": text}).encode(), {
             "Authorization": "Bearer " + token, "Content-Type": "application/json"})
         response = connection.getresponse()

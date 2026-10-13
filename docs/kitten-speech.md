@@ -146,6 +146,8 @@ starts the service after reboot, retries if the private interface is not ready,
 and runs the process as the specified user. Logs remain in the private runtime
 directory and do not include request text. Four threads are a parallelism bound,
 not a macOS CPU quota; choose fewer on a smaller or busier host.
+If measured long-report timings require it, set `CAST_KITTEN_TIMEOUT=10` on the
+Cast client. The overall report freshness check still applies after rendering.
 
 To update, reinstall from the lock files, copy the updated package, verify the
 model hashes, then run `sudo launchctl kickstart -k system/org.igw.kitten-primary`.
