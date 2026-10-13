@@ -23,3 +23,4 @@ secrets.yaml
 # Site-specific speech credentials and deployments
 speech-token
 *.private.json
+*.private.plist

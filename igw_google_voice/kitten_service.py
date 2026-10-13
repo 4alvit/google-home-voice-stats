@@ -25,7 +25,7 @@ def valid_text(text):
             and not any(ord(c) < 32 and c not in "\n\r\t" for c in text))
 
 
-def _worker(connection, model_dir):
+def _worker(connection, model_dir, threads):
     # Import only in the supervised child. The parent can terminate a stuck native call.
     os.environ.update(HF_HUB_OFFLINE="1", HF_HUB_DISABLE_TELEMETRY="1",
                       OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
@@ -35,7 +35,7 @@ def _worker(connection, model_dir):
     from unittest.mock import patch
     from kittenml import KittenTTS
     options = ort.SessionOptions()
-    options.intra_op_num_threads = 1
+    options.intra_op_num_threads = threads
     options.inter_op_num_threads = 1
     original = ort.InferenceSession
     with patch.object(ort, "InferenceSession",
@@ -71,7 +71,10 @@ class BusyError(RuntimeError):
 
 
 class Synthesizer:
-    def __init__(self, model_dir, timeout=12):
+    def __init__(self, model_dir, timeout=12, threads=1):
+        if not isinstance(threads, int) or not 1 <= threads <= 4:
+            raise ValueError("Speech threads must be between one and four")
+        self.threads = threads
         self.model_dir, self.timeout = model_dir, timeout
         self.lock = threading.Lock()
         self.ready = threading.Event()
@@ -83,7 +86,7 @@ class Synthesizer:
         context = mp.get_context("spawn")
         parent, child = context.Pipe()
         self.connection = parent
-        self.process = context.Process(target=_worker, args=(child, self.model_dir), daemon=True)
+        self.process = context.Process(target=_worker, args=(child, self.model_dir, self.threads), daemon=True)
         self.process.start()
         child.close()
         if not parent.poll(90) or parent.recv() is not True:
@@ -107,6 +110,8 @@ class Synthesizer:
             self._start()
         except Exception:
             LOG.error("speech_worker_restart_failed")
+            # Both Kubernetes and launchd restart the process after a failed recovery.
+            os.kill(os.getpid(), signal.SIGTERM)
         finally:
             self.lock.release()
 
@@ -223,7 +228,8 @@ def main():
     token = Path(os.environ["KITTEN_TOKEN_FILE"]).read_text().strip()
     if len(token) < 32 or any(c.isspace() for c in token):
         raise SystemExit("Invalid speech service token")
-    synth = Synthesizer(os.environ.get("KITTEN_MODEL_DIR", "/models/nano"))
+    synth = Synthesizer(os.environ.get("KITTEN_MODEL_DIR", "/models/nano"),
+                        threads=int(os.environ.get("KITTEN_THREADS", "1")))
     server = SpeechServer((os.environ.get("KITTEN_BIND_HOST", "127.0.0.1"),
                            int(os.environ.get("KITTEN_PORT", "8092"))), synth, token)
     try:

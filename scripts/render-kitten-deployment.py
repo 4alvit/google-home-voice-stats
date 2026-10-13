@@ -3,6 +3,7 @@
 import argparse
 import ipaddress
 import json
+import re
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--namespace', default='igw-speech')
@@ -13,6 +14,8 @@ for role in ('primary', 'secondary'):
     parser.add_argument('--' + role + '-cpu-millicores', type=int,
                         default=500 if role == 'primary' else 100)
 args = parser.parse_args()
+if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', args.namespace):
+    parser.error('Namespace must be a Kubernetes DNS label')
 items = [{'apiVersion':'v1','kind':'Namespace','metadata':{'name':args.namespace}}]
 for role in ('primary','secondary'):
     address = getattr(args, role + '_address')
@@ -20,7 +23,7 @@ for role in ('primary','secondary'):
     if not ip.is_private or ip.is_loopback or ip.is_unspecified or ip.version != 4:
         parser.error('Use a private IPv4 address assigned to each node')
     image = getattr(args, role + '_image')
-    if '@sha256:' not in image:
+    if not re.fullmatch(r'[a-z0-9][a-z0-9._:/-]*[a-z0-9]@sha256:[0-9a-f]{64}', image):
         parser.error('Images must be pinned by digest')
     cpu = getattr(args, role + '_cpu_millicores')
     if not 1 <= cpu <= 1000:

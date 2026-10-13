@@ -2,6 +2,8 @@
 from dataclasses import replace
 import io
 import json
+import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -16,7 +18,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from igw_google_voice import cast_media
 from igw_google_voice.cast_config import CastConfig
 from igw_google_voice.kitten_client import fetch_audio
-from igw_google_voice.kitten_service import SpeechServer, BusyError
+from igw_google_voice.kitten_service import SpeechServer, BusyError, Synthesizer
 
 
 def wav_bytes():
@@ -118,6 +120,22 @@ class TransportTests(unittest.TestCase):
 
 
 class ServiceTests(unittest.TestCase):
+    def test_failed_recovery_exits_for_supervisor_and_releases_lock(self):
+        with patch.object(Synthesizer, '_start'):
+            synth = Synthesizer('/unused')
+        synth.lock.acquire()
+        with patch.object(synth, '_start', side_effect=RuntimeError()), patch('os.kill') as kill:
+            synth._recover()
+        kill.assert_called_once_with(os.getpid(), signal.SIGTERM)
+        self.assertFalse(synth.lock.locked())
+
+    def test_invalid_thread_count_never_starts_a_worker(self):
+        with patch.object(Synthesizer, '_start') as start:
+            for threads in (0, 5, -1, '4'):
+                with self.subTest(threads=threads), self.assertRaises(ValueError):
+                    Synthesizer('/unused', threads=threads)
+            start.assert_not_called()
+
     def test_auth_validation_audio_and_busy_response(self):
         class Synth:
             ready=threading.Event()

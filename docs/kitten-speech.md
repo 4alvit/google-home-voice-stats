@@ -1,8 +1,8 @@
 # KittenTTS Nano with a second server
 
 The standalone Google Cast adapter can request English speech from two private
-CPU-only servers, in order. The primary and secondary both preload KittenTTS
-Nano 0.8 INT8, using the Jasper voice. The NAS continues to fetch the authoritative
+CPU-only servers, in order. Both preload KittenTTS Nano 0.8, using the Jasper
+voice. Linux containers default to INT8; a native Intel Mac can use FP32. The NAS continues to fetch the authoritative
 IGW report, draw its cards, encode H.264/AAC video and deliver it to Google Cast.
 Neither Home Assistant TTS, FCC nor Homeway participates in this speech path.
 
@@ -58,7 +58,8 @@ Health probes use HTTP directly rather than repeatedly starting Python processes
 The temporary mount must permit executable mappings (`--tmpfs /tmp:size=64m,exec`
 for Docker): phonemizer copies its eSpeak shared library there before loading it.
 The Kubernetes memory-backed `emptyDir` has this behavior by default.
-ONNX explicitly uses one intra-op and one inter-op thread. A supervised child
+ONNX defaults to one intra-op and one inter-op thread. `KITTEN_THREADS` permits
+one to four intra-op threads when the host has capacity. A supervised child
 preloads and warms the model before readiness, handles one request at a time,
 and is terminated/reloaded if generation exceeds twelve seconds. Busy requests
 receive 503 so the caller can use the other server. Text/audio are not retained;
@@ -103,6 +104,55 @@ Recreate the Cast container using an image containing this integration. Keep its
 existing IGW credentials, media address, Cast device, and eSpeak installation.
 The NAS needs no ONNX or model dependencies.
 
+## Native Intel Mac primary
+
+Measure the actual deployment host before selecting a format. On a tested older
+Intel Mac, a busy Linux VM took about 74 seconds to synthesize a 5.5-second
+sentence with INT8. Native macOS with FP32 and four threads reduced that to about
+three seconds. These are observations, not a performance guarantee. The FP32
+graph is about 57 MB plus the 3.3 MB voice file; the complete Python environment
+uses additional disk and memory. Both formats are the same Nano model family.
+
+For macOS 12 on Intel, use the separate compatibility lock below. Its ONNX
+Runtime 1.19.2 wheel supports that OS; newer Intel wheels require macOS 13 or
+later. The Linux image continues to use its current, separate runtime lock.
+Do not install the Mac compatibility lock into the Linux image.
+
+From a checkout of this repository, under an existing unprivileged service user:
+
+```sh
+SPEECH_ROOT="$HOME/.local/share/igw-speech"
+mkdir -p "$SPEECH_ROOT/app"
+chmod 700 "$SPEECH_ROOT"
+python3.11 -m venv "$SPEECH_ROOT"
+"$SPEECH_ROOT/bin/python" -m pip install --require-hashes --only-binary=:all: \
+  -r requirements-kitten-macos-intel.lock
+"$SPEECH_ROOT/bin/python" -m pip install --no-deps --require-hashes --only-binary=:all: \
+  -r requirements-kitten-package.lock
+cp -R igw_google_voice "$SPEECH_ROOT/app/"
+python3 scripts/download-nano.py --variant fp32 --output "$SPEECH_ROOT/models/nano-fp32"
+install -m 600 speech-token "$SPEECH_ROOT/speech-token"
+python3 scripts/render-kitten-launchd.py --root "$SPEECH_ROOT" \
+  --user "$(id -un)" --address MAC_PRIVATE_IP --threads 4 > primary.private.plist
+plutil -lint primary.private.plist
+sudo install -o root -g wheel -m 644 primary.private.plist \
+  /Library/LaunchDaemons/org.igw.kitten-primary.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/org.igw.kitten-primary.plist
+```
+
+Use the same dedicated `speech-token` as the secondary. Point the first Cast
+endpoint to the physical Mac's private address, not its VM's address. `launchd`
+starts the service after reboot, retries if the private interface is not ready,
+and runs the process as the specified user. Logs remain in the private runtime
+directory and do not include request text. Four threads are a parallelism bound,
+not a macOS CPU quota; choose fewer on a smaller or busier host.
+
+To update, reinstall from the lock files, copy the updated package, verify the
+model hashes, then run `sudo launchctl kickstart -k system/org.igw.kitten-primary`.
+To test failover, run `sudo launchctl bootout system/org.igw.kitten-primary`,
+verify `kitten_secondary` from the Cast client, and bootstrap the plist again.
+Keep only the secondary Kubernetes deployment when using a native primary.
+
 ## Validation and troubleshooting
 
 - Check `/healthz` on each server, then synthesize a fixed non-private sentence
@@ -118,6 +168,8 @@ The NAS needs no ONNX or model dependencies.
   routing. Do not disable report freshness checks to hide slow generation.
 - A 401 indicates a token mismatch; 503 means warming up or busy; 502 means the
   worker failed and is being recovered. Logs omit report text and credentials.
+- If worker recovery fails, the service exits and Kubernetes or `launchd`
+  restarts it. The other endpoint continues to provide speech during recovery.
 - To roll back the speech choice, set `CAST_TTS_PROVIDER=espeak` and recreate only
   the Cast container. The two Nano deployments can remain idle or be scaled down.
 
