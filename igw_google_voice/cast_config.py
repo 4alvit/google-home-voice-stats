@@ -29,6 +29,9 @@ class CastConfig:
     tts_provider: str = "espeak"
     piper_model: str = field(default="", repr=False)
     piper_timeout: int = 10
+    kitten_endpoints: tuple[str, ...] = field(default=(), repr=False)
+    kitten_token: str = field(default="", repr=False)
+    kitten_timeout: int = 8
 
     @classmethod
     def from_env(cls, env=None):
@@ -73,12 +76,32 @@ class CastConfig:
             provider = env.get("CAST_TTS_PROVIDER", "espeak")
             model = env.get("CAST_PIPER_MODEL", "")
             timeout = int(env.get("CAST_PIPER_TIMEOUT", "10"))
-            if provider not in {"espeak", "piper"} or not 1 <= timeout <= 20:
+            if provider not in {"espeak", "piper", "kitten"} or not 1 <= timeout <= 20:
                 raise ValueError()
             if provider == "piper" and (not Path(model).is_absolute() or not model.endswith(".onnx")
                                         or any(ord(c) < 32 for c in model)):
                 raise ValueError()
+            endpoints, speech_token = (), ""
+            speech_timeout = int(env.get("CAST_KITTEN_TIMEOUT", "8"))
+            if not 1 <= speech_timeout <= 10:
+                raise ValueError()
+            if provider == "kitten":
+                endpoints = tuple(required("CAST_KITTEN_ENDPOINTS").split(","))
+                speech_token = required("CAST_KITTEN_TOKEN")
+                if len(endpoints) != 2 or len(set(endpoints)) != 2 or len(speech_token) < 32:
+                    raise ValueError()
+                for endpoint in endpoints:
+                    speech_url = urlsplit(endpoint)
+                    if (speech_url.scheme != "http" or not speech_url.hostname
+                            or not local_http_host(speech_url.hostname)
+                            or speech_url.path != "/v1/speech"
+                            or speech_url.query or speech_url.fragment
+                            or speech_url.username or speech_url.password):
+                        raise ValueError()
+                    if not 1024 <= (speech_url.port or 80) <= 65535:
+                        raise ValueError()
             return cls(url, token, api_token, host, UUID(required("CAST_UUID")), media_url,
-                       bind, port, age, client_id, client_secret, provider, model, timeout)
+                       bind, port, age, client_id, client_secret, provider, model, timeout,
+                       endpoints, speech_token, speech_timeout)
         except (ValueError, TypeError):
             raise ValueError("Missing or invalid service configuration; see the standalone Cast guide.") from None

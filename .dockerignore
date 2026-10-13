@@ -13,3 +13,7 @@
 !.github/requirements-build.txt
 !requirements-cast.lock
 !requirements-piper.lock
+!requirements-kitten.lock
+!requirements-kitten-package.lock
+!scripts/
+!scripts/download-nano.py

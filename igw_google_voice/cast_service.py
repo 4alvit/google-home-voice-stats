@@ -81,7 +81,9 @@ class ReportEngine:
         if renderer is None:
             from .cast_media import render_report_video
             renderer = partial(render_report_video, tts_provider=config.tts_provider,
-                               piper_model=config.piper_model, piper_timeout=config.piper_timeout)
+                               piper_model=config.piper_model, piper_timeout=config.piper_timeout,
+                               kitten_endpoints=config.kitten_endpoints,
+                               kitten_token=config.kitten_token, kitten_timeout=config.kitten_timeout)
         self.config, self.fetcher, self.renderer = config, fetcher, renderer
         self.player = player or CastPlayback(config)
         self.clock = clock
@@ -129,7 +131,7 @@ class ReportEngine:
                 return None
 
     def _run(self, key):
-        result, path = "internal_failure", None
+        result, path, speech_provider = "internal_failure", None, "none"
         try:
             self.prune()
             fallback = False
@@ -145,6 +147,7 @@ class ReportEngine:
             token = secrets.token_urlsafe(24)
             path = self.root / (token + ".mp4")
             rendered = self.renderer(key, reports, path)
+            speech_provider = rendered.get("tts_provider", "unknown")
             if not fallback and time.time() - snapshot["generated_at"] > self.config.max_age:
                 result = "snapshot_expired"
                 return
@@ -164,7 +167,7 @@ class ReportEngine:
                 if not published:
                     path.unlink(missing_ok=True)
             with self.lock:
-                self.state = {"state": "idle", "result": result}
+                self.state = {"state": "idle", "result": result, "tts_provider": speech_provider}
                 self.busy = False
 
     def close(self):
