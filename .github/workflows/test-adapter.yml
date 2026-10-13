@@ -71,7 +71,7 @@ jobs:
         run: |
           docker build -f Dockerfile.kitten -t igw-kitten-check .
           docker run --rm --network none --memory 768m --cpus 1 \
-            --read-only --tmpfs /tmp:size=64m --cap-drop ALL \
+            --read-only --tmpfs /tmp:size=64m,exec --cap-drop ALL \
             --security-opt no-new-privileges \
             -v "$PWD/tests/smoke_kitten.py:/app/smoke_kitten.py:ro" \
             igw-kitten-check python /app/smoke_kitten.py

@@ -51,6 +51,9 @@ lists Apache-2.0 licensing. Preserve upstream attribution when redistributing.
 
 The model graph is about 24 MB, but the process needs substantially more RAM.
 The example deployment allows 768 MiB, one CPU, and a 64 MiB temporary filesystem.
+The temporary mount must permit executable mappings (`--tmpfs /tmp:size=64m,exec`
+for Docker): phonemizer copies its eSpeak shared library there before loading it.
+The Kubernetes memory-backed `emptyDir` has this behavior by default.
 ONNX explicitly uses one intra-op and one inter-op thread. A supervised child
 preloads and warms the model before readiness, handles one request at a time,
 and is terminated/reloaded if generation exceeds twelve seconds. Busy requests
