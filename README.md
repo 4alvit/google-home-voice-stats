@@ -1,5 +1,7 @@
 # IGW energy reports on Google Home / Nest
 
+[![Fuzzing: RC only](https://img.shields.io/badge/Fuzzing-RC%20only-blue)](docs/fuzzing.md)
+
 Show and speak battery charge, solar power, today's solar energy, an energy
 summary, or active alarms on a Google Cast display. The standalone adapter fetches
 a current Inverter Gateway (IGW) report and generates a short dashboard video with
@@ -413,3 +415,9 @@ scope and verification.
 
 See [dependency lock maintenance](docs/DEPENDENCY_LOCKS.md) for the hash-verified
 CI and container installation steps and update checks.
+
+## Release-candidate fuzzing
+
+The real IGW URL validator receives synthetic URL strings and verifies transport, path and credential/query exclusion. The explicit private-HTTP option is checked independently. No URL is fetched and no DNS lookup is made.
+
+[RC-only fuzzing policy, local reproduction and failure handling](docs/fuzzing.md).

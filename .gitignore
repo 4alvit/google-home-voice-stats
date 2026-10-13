@@ -28,3 +28,9 @@ speech-tls/
 *.key
 *.csr
 *.srl
+
+# Isolated RC fuzz runtime and local diagnostic inputs
+.fuzz-venv/
+crash-*
+timeout-*
+oom-*
