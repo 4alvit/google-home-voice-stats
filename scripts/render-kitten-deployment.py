@@ -29,16 +29,20 @@ for role in ('primary','secondary'):
     if not 1 <= cpu <= 1000:
         parser.error('CPU requests must be between 1 and 1000 millicores')
     # Probe from the kubelet, without launching Python on a busy speech CPU.
-    probe = {'httpGet':{'host':address,'port':8092,'path':'/healthz'}}
+    probe = {'httpGet':{'scheme':'HTTPS','host':address,'port':8092,'path':'/healthz'}}
     name = 'kitten-' + role
     labels = {'app.kubernetes.io/name':'igw-kitten','app.kubernetes.io/instance':name}
     container = {
         'name':'speech','image':image,'imagePullPolicy':'IfNotPresent',
         'env':[{'name':'KITTEN_BIND_HOST','value':address},
-               {'name':'KITTEN_TOKEN_FILE','value':'/run/speech/token'}],
+               {'name':'KITTEN_TOKEN_FILE','value':'/run/speech/token'},
+               {'name':'KITTEN_TLS_CERT_FILE','value':'/run/speech-tls/tls.crt'},
+               {'name':'KITTEN_TLS_KEY_FILE','value':'/run/speech-tls/tls.key'}],
         'resources':{'requests':{'cpu':str(cpu)+'m','memory':'256Mi'},'limits':{'cpu':'1','memory':'768Mi'}},
         'securityContext':{'allowPrivilegeEscalation':False,'readOnlyRootFilesystem':True,'capabilities':{'drop':['ALL']}},
-        'volumeMounts':[{'name':'token','mountPath':'/run/speech','readOnly':True}, {'name':'tmp','mountPath':'/tmp'}],
+        'volumeMounts':[{'name':'token','mountPath':'/run/speech','readOnly':True},
+                        {'name':'tls','mountPath':'/run/speech-tls','readOnly':True},
+                        {'name':'tmp','mountPath':'/tmp'}],
         'startupProbe':{**probe,'periodSeconds':5,'failureThreshold':30,'timeoutSeconds':3},
         'readinessProbe':{**probe,'periodSeconds':10,'timeoutSeconds':3},
         'livenessProbe':{**probe,'periodSeconds':30,'failureThreshold':3,'timeoutSeconds':3},
@@ -51,5 +55,6 @@ for role in ('primary','secondary'):
           'securityContext':{'runAsNonRoot':True,'runAsUser':10001,'runAsGroup':10001,'fsGroup':10001,'seccompProfile':{'type':'RuntimeDefault'}},
           'containers':[container],
           'volumes':[{'name':'token','secret':{'secretName':'igw-kitten-token','defaultMode':288}},
+                     {'name':'tls','secret':{'secretName':name+'-tls','defaultMode':288}},
                      {'name':'tmp','emptyDir':{'medium':'Memory','sizeLimit':'64Mi'}}]}}}})
 print(json.dumps({'apiVersion':'v1','kind':'List','items':items}, indent=2))

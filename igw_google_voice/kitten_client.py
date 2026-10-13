@@ -1,18 +1,31 @@
-"""Bounded private HTTP speech request; run in an expendable subprocess."""
+"""Bounded, CA-verified HTTPS speech request; run in an expendable subprocess."""
 import http.client
 import io
 import json
 from pathlib import Path
+import ssl
 import sys
 from urllib.parse import urlsplit
 import wave
 
+from .__main__ import local_http_host
+
 MAX_AUDIO = 6_000_000
 
 
-def fetch_audio(endpoint, token, text):
+def fetch_audio(endpoint, token, text, ca_file):
     parsed = urlsplit(endpoint)
-    connection = http.client.HTTPConnection(parsed.hostname, parsed.port or 80, timeout=2)
+    # Enforce TLS here too: callers must never send credentials over plain HTTP.
+    if (parsed.scheme != "https" or not parsed.hostname
+            or not local_http_host(parsed.hostname) or parsed.path != "/v1/speech"
+            or parsed.username or parsed.password or parsed.query or parsed.fragment):
+        raise ValueError("invalid speech endpoint")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.hostname_checks_common_name = False
+    context.load_verify_locations(cafile=ca_file)
+    connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443,
+                                             timeout=2, context=context)
     try:
         connection.connect()
         # The parent enforces the configured total budget (at most fifteen seconds).
@@ -42,7 +55,7 @@ def fetch_audio(endpoint, token, text):
 def main():
     try:
         request = json.loads(sys.stdin.buffer.read(16384))
-        data = fetch_audio(request["endpoint"], request["token"], request["text"])
+        data = fetch_audio(request["endpoint"], request["token"], request["text"], request["ca_file"])
         Path(sys.argv[1]).write_bytes(data)
     except Exception:
         raise SystemExit(1) from None

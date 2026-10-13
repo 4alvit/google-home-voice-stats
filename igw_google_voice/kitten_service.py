@@ -8,6 +8,7 @@ import logging
 import multiprocessing as mp
 import os
 import signal
+import ssl
 import sys
 from pathlib import Path
 import threading
@@ -139,8 +140,9 @@ class Synthesizer:
 
 class SpeechServer(ThreadingHTTPServer):
     daemon_threads = True
-    def __init__(self, address, synthesizer, token):
+    def __init__(self, address, synthesizer, token, *, tls_context):
         self.synthesizer, self.token = synthesizer, token
+        self.tls_context = tls_context
         self.slots = threading.BoundedSemaphore(8)
         super().__init__(address, SpeechHandler)
 
@@ -156,8 +158,15 @@ class SpeechServer(ThreadingHTTPServer):
 
     def process_request_thread(self, request, client_address):
         try:
-            super().process_request_thread(request, client_address)
+            # Handshake inside the bounded worker, never in the accept loop.
+            request.settimeout(5)
+            try:
+                secure = self.tls_context.wrap_socket(request, server_side=True)
+            except OSError:
+                return
+            super().process_request_thread(secure, client_address)
         finally:
+            request.close()
             self.slots.release()
 
     def handle_error(self, request, client_address):
@@ -222,20 +231,32 @@ class SpeechHandler(BaseHTTPRequestHandler):
             self._send(200, audio, "audio/wav")
 
 
+def server_tls_context(cert_file, key_file):
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.load_cert_chain(certfile=cert_file, keyfile=key_file)
+    return context
+
+
 def main():
     # A container PID 1 must install an explicit termination handler.
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     token = Path(os.environ["KITTEN_TOKEN_FILE"]).read_text().strip()
     if len(token) < 32 or any(c.isspace() for c in token):
         raise SystemExit("Invalid speech service token")
+    context = server_tls_context(os.environ["KITTEN_TLS_CERT_FILE"],
+                                 os.environ["KITTEN_TLS_KEY_FILE"])
     synth = Synthesizer(os.environ.get("KITTEN_MODEL_DIR", "/models/nano"),
                         threads=int(os.environ.get("KITTEN_THREADS", "1")))
-    server = SpeechServer((os.environ.get("KITTEN_BIND_HOST", "127.0.0.1"),
-                           int(os.environ.get("KITTEN_PORT", "8092"))), synth, token)
+    server = None
     try:
+        server = SpeechServer((os.environ.get("KITTEN_BIND_HOST", "127.0.0.1"),
+                               int(os.environ.get("KITTEN_PORT", "8092"))), synth, token,
+                              tls_context=context)
         server.serve_forever()
     finally:
-        server.server_close()
+        if server is not None:
+            server.server_close()
         synth.close()
 
 

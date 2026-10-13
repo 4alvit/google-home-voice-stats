@@ -24,3 +24,7 @@ secrets.yaml
 speech-token
 *.private.json
 *.private.plist
+speech-tls/
+*.key
+*.csr
+*.srl

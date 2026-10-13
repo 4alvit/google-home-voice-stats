@@ -33,6 +33,8 @@ document = {
         'KITTEN_BIND_HOST': str(address), 'KITTEN_THREADS': str(args.threads),
         'KITTEN_MODEL_DIR': str(root / 'models/nano-fp32'),
         'KITTEN_TOKEN_FILE': str(root / 'speech-token'),
+        'KITTEN_TLS_CERT_FILE': str(root / 'tls/server.crt'),
+        'KITTEN_TLS_KEY_FILE': str(root / 'tls/server.key'),
     },
     'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 30,
     'ExitTimeOut': 10, 'Umask': 63,

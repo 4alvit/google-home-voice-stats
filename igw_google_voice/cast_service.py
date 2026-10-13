@@ -83,7 +83,8 @@ class ReportEngine:
             renderer = partial(render_report_video, tts_provider=config.tts_provider,
                                piper_model=config.piper_model, piper_timeout=config.piper_timeout,
                                kitten_endpoints=config.kitten_endpoints,
-                               kitten_token=config.kitten_token, kitten_timeout=config.kitten_timeout)
+                               kitten_token=config.kitten_token, kitten_timeout=config.kitten_timeout,
+                               kitten_ca_file=config.kitten_ca_file)
         self.config, self.fetcher, self.renderer = config, fetcher, renderer
         self.player = player or CastPlayback(config)
         self.clock = clock

@@ -8,8 +8,9 @@ Neither Home Assistant TTS, FCC nor Homeway participates in this speech path.
 
 ## Request path
 
-1. The Cast renderer sends the original report text to the primary `/v1/speech`.
-2. Connection failure, timeout, an HTTP error, or invalid/truncated audio causes
+1. The Cast renderer verifies the primary server’s TLS certificate against the
+   dedicated speech CA and sends the original text to its HTTPS `/v1/speech`.
+2. Connection failure, a TLS verification error, timeout, an HTTP error, or invalid/truncated audio causes
    an attempt on the secondary, with the same text.
 3. If both fail, the existing local eSpeak voice reads the same report.
 
@@ -23,6 +24,36 @@ outdated report. `/v1/status` reports `kitten_primary`, `kitten_secondary`, or
 No numerical values are invented or rewritten by an LLM. IGW should continue to
 spell out units such as “watts” and “kilowatt hours”. The selected model is for
 English, not multilingual KittenTTS 2.
+
+## Encrypted transport and certificates
+
+HTTPS is mandatory on both endpoints, including when using a VPN. A private
+destination address alone does not guarantee an encrypted route: a NAS may reach
+a VPN address through a router over an unencrypted LAN first. TLS starts in the
+Cast process, so bearer credentials, report text and audio remain encrypted all
+the way to the speech process. There is no HTTP or unverified-TLS fallback.
+
+The client trusts only the PEM CA bundle at `CAST_KITTEN_CA_FILE`, verifies the
+certificate's validity and IP subject alternative name (SAN), and requires
+TLS 1.2 or newer. Common-name-only certificates are not accepted. Each server
+has its own key; the CA signing key must never be deployed to either server or
+the NAS. Use addresses from the actual configured URLs when issuing certificates.
+
+Create certificates on the operator's machine with Python and OpenSSL, outside
+the checkout. The output directory must not already exist:
+
+```sh
+umask 077
+python3 scripts/create-speech-tls.py --output /PRIVATE/OPERATOR/PATH/speech-tls \
+  --primary-address PRIMARY_PRIVATE_IP --secondary-address SECONDARY_PRIVATE_IP
+```
+
+The directory and files are private to their owner. Transfer files over SSH:
+`ca.crt` to the NAS, `primary.crt`/`primary.key` to the primary, and
+`secondary.crt`/`secondary.key` to the secondary. Keep the remaining CA material
+in protected operator storage. Never commit keys, site certificates, tokens or
+rendered manifests. Leaves last 365 days; the CA lasts five years. See renewal
+below. Servers refuse to start without a valid certificate/key pair.
 
 ## Reproducible service image
 
@@ -54,7 +85,10 @@ The example deployment allows 768 MiB, one CPU, and a 64 MiB temporary filesyste
 It requests 500 millicores for the primary and 100 for the secondary; override
 these with `--primary-cpu-millicores` and `--secondary-cpu-millicores` to fit the
 nodes. Reserve enough primary CPU for prompt replies under competing workloads.
-Health probes use HTTP directly rather than repeatedly starting Python processes.
+Health probes use HTTPS directly rather than repeatedly starting Python processes.
+Kubernetes' native HTTPS probes skip certificate verification; they carry no
+token or report text and indicate readiness only. Always validate trust separately
+from the NAS with the real CA, as shown below.
 The temporary mount must permit executable mappings (`--tmpfs /tmp:size=64m,exec`
 for Docker): phonemizer copies its eSpeak shared library there before loading it.
 The Kubernetes memory-backed `emptyDir` has this behavior by default.
@@ -79,6 +113,12 @@ umask 077
 python3 -c 'import secrets; print(secrets.token_urlsafe(48))' > speech-token
 kubectl create namespace igw-speech
 kubectl -n igw-speech create secret generic igw-kitten-token --from-file=token=speech-token
+kubectl -n igw-speech create secret tls kitten-primary-tls \
+  --cert=/PRIVATE/OPERATOR/PATH/speech-tls/primary.crt \
+  --key=/PRIVATE/OPERATOR/PATH/speech-tls/primary.key
+kubectl -n igw-speech create secret tls kitten-secondary-tls \
+  --cert=/PRIVATE/OPERATOR/PATH/speech-tls/secondary.crt \
+  --key=/PRIVATE/OPERATOR/PATH/speech-tls/secondary.key
 python3 scripts/render-kitten-deployment.py \
   --primary-node PRIMARY_NODE --primary-address PRIMARY_PRIVATE_IP \
   --primary-image REGISTRY/igw-kitten@sha256:PRIMARY_DIGEST \
@@ -90,12 +130,16 @@ kubectl apply -f deployment.private.json
 Keep the token and site-specific manifest out of source control. Mounting the
 secret as a file keeps it out of process arguments. Token changes require a
 rollout restart of both services and an update to the Cast environment.
+The per-server TLS secrets mount read-only at `/run/speech-tls`; private keys
+are readable only by root and the service group. With a native Mac primary,
+create only the secondary TLS secret and deploy only the secondary workload.
 
 Configure the Cast container, with primary first:
 
 ```dotenv
 CAST_TTS_PROVIDER=kitten
-CAST_KITTEN_ENDPOINTS=http://PRIMARY_PRIVATE_IP:8092/v1/speech,http://SECONDARY_PRIVATE_IP:8092/v1/speech
+CAST_KITTEN_ENDPOINTS=https://PRIMARY_PRIVATE_IP:8092/v1/speech,https://SECONDARY_PRIVATE_IP:8092/v1/speech
+CAST_KITTEN_CA_FILE=/run/speech-ca/ca.crt
 CAST_KITTEN_TOKEN=YOUR_DEDICATED_LONG_RANDOM_TOKEN
 CAST_KITTEN_TIMEOUT=8
 ```
@@ -103,6 +147,9 @@ CAST_KITTEN_TIMEOUT=8
 Recreate the Cast container using an image containing this integration. Keep its
 existing IGW credentials, media address, Cast device, and eSpeak installation.
 The NAS needs no ONNX or model dependencies.
+Mount the NAS directory containing only `ca.crt` read-only at `/run/speech-ca`.
+For Compose, add a volume such as `./speech-ca:/run/speech-ca:ro`. Do not mount
+the operator's entire certificate directory or its signing/private keys.
 
 ## Native Intel Mac primary
 
@@ -132,6 +179,10 @@ python3.11 -m venv "$SPEECH_ROOT"
 cp -R igw_google_voice "$SPEECH_ROOT/app/"
 python3 scripts/download-nano.py --variant fp32 --output "$SPEECH_ROOT/models/nano-fp32"
 install -m 600 speech-token "$SPEECH_ROOT/speech-token"
+mkdir -p "$SPEECH_ROOT/tls"
+chmod 700 "$SPEECH_ROOT/tls"
+install -m 600 /PRIVATE/OPERATOR/PATH/speech-tls/primary.crt "$SPEECH_ROOT/tls/server.crt"
+install -m 600 /PRIVATE/OPERATOR/PATH/speech-tls/primary.key "$SPEECH_ROOT/tls/server.key"
 python3 scripts/render-kitten-launchd.py --root "$SPEECH_ROOT" \
   --user "$(id -un)" --address MAC_PRIVATE_IP --threads 4 > primary.private.plist
 plutil -lint primary.private.plist
@@ -159,7 +210,8 @@ Keep only the secondary Kubernetes deployment when using a native primary.
 
 ## Validation and troubleshooting
 
-- Check `/healthz` on each server, then synthesize a fixed non-private sentence
+- From the NAS, run `curl --fail --cacert /PATH/TO/ca.crt https://SERVER_PRIVATE_IP:8092/healthz`
+  on each server, then synthesize a fixed non-private sentence
   from the NAS. A successful response is 24 kHz mono PCM16 WAV.
 - Render one complete report. Check the authenticated Cast `/v1/status` provider
   and confirm the receiver actually starts playback.
@@ -172,6 +224,10 @@ Keep only the secondary Kubernetes deployment when using a native primary.
   routing. Do not disable report freshness checks to hide slow generation.
 - A 401 indicates a token mismatch; 503 means warming up or busy; 502 means the
   worker failed and is being recovered. Logs omit report text and credentials.
+- For certificate failures, check the CA mount, leaf expiry, host clocks and SAN.
+  A changed server IP requires a reissued certificate. Never use `curl -k`, disable
+  hostname verification, or change the endpoint back to HTTP. A failed TLS check
+  sends no bearer or report text and invokes the normal secondary/local fallback.
 - If worker recovery fails, the service exits and Kubernetes or `launchd`
   restarts it. The other endpoint continues to provide speech during recovery.
 - To roll back the speech choice, set `CAST_TTS_PROVIDER=espeak` and recreate only
@@ -181,3 +237,24 @@ Run `python -m unittest discover -s tests -v` in the project's test environment.
 Tests cover ordered failover, partial audio deletion, transport validation,
 credentials, input limits and hard timeouts. Hardware timings and actual Cast
 playback require separate deployment verification.
+
+## Certificate renewal
+
+Check expiry at least 30 days in advance with
+`openssl x509 -checkend 2592000 -noout -in SERVER.crt`
+(a nonzero result means renewal is needed). On the protected operator machine,
+re-sign each retained CSR with its matching SAN configuration:
+
+```sh
+openssl x509 -req -in primary.csr -CA ca.crt -CAkey ca.key \
+  -set_serial "0x$(openssl rand -hex 16)" -days 365 -sha256 \
+  -extfile primary.cnf -out primary-renewed.crt
+```
+
+Repeat for the secondary. Replace the corresponding leaf certificate securely
+and restart only that speech process, one server at a time; verify from the NAS
+before proceeding. The CA file on the NAS stays unchanged for leaf renewal. If
+rotating the CA, first distribute a bundle containing the old and new CA, replace
+and verify both server certificates, and finally remove the old CA. Keep all
+private keys outside source control and retain the old working configuration
+until verified; rolling back must not reintroduce plaintext transport.
