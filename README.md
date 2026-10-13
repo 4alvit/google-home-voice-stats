@@ -421,3 +421,6 @@ CI and container installation steps and update checks.
 The real IGW URL validator receives synthetic URL strings and verifies transport, path and credential/query exclusion. The explicit private-HTTP option is checked independently. No URL is fetched and no DNS lookup is made.
 
 [RC-only fuzzing policy, local reproduction and failure handling](docs/fuzzing.md).
+
+Source release artifacts, installation checks and acceptance limits are documented in
+[release packaging](docs/release-packaging.md) and [the release strategy](RELEASING.md).
