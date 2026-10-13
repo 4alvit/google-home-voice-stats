@@ -10,9 +10,10 @@ for role in ('primary', 'secondary'):
     parser.add_argument('--' + role + '-node', required=True)
     parser.add_argument('--' + role + '-address', required=True)
     parser.add_argument('--' + role + '-image', required=True)
+    parser.add_argument('--' + role + '-cpu-millicores', type=int,
+                        default=500 if role == 'primary' else 100)
 args = parser.parse_args()
 items = [{'apiVersion':'v1','kind':'Namespace','metadata':{'name':args.namespace}}]
-probe = ['python','-c',"import os,urllib.request; urllib.request.urlopen('http://'+os.environ['KITTEN_BIND_HOST']+':8092/healthz',timeout=2).close()"]
 for role in ('primary','secondary'):
     address = getattr(args, role + '_address')
     ip = ipaddress.ip_address(address)
@@ -21,18 +22,23 @@ for role in ('primary','secondary'):
     image = getattr(args, role + '_image')
     if '@sha256:' not in image:
         parser.error('Images must be pinned by digest')
+    cpu = getattr(args, role + '_cpu_millicores')
+    if not 1 <= cpu <= 1000:
+        parser.error('CPU requests must be between 1 and 1000 millicores')
+    # Probe from the kubelet, without launching Python on a busy speech CPU.
+    probe = {'httpGet':{'host':address,'port':8092,'path':'/healthz'}}
     name = 'kitten-' + role
     labels = {'app.kubernetes.io/name':'igw-kitten','app.kubernetes.io/instance':name}
     container = {
         'name':'speech','image':image,'imagePullPolicy':'IfNotPresent',
         'env':[{'name':'KITTEN_BIND_HOST','value':address},
                {'name':'KITTEN_TOKEN_FILE','value':'/run/speech/token'}],
-        'resources':{'requests':{'cpu':'100m','memory':'256Mi'},'limits':{'cpu':'1','memory':'768Mi'}},
+        'resources':{'requests':{'cpu':str(cpu)+'m','memory':'256Mi'},'limits':{'cpu':'1','memory':'768Mi'}},
         'securityContext':{'allowPrivilegeEscalation':False,'readOnlyRootFilesystem':True,'capabilities':{'drop':['ALL']}},
         'volumeMounts':[{'name':'token','mountPath':'/run/speech','readOnly':True}, {'name':'tmp','mountPath':'/tmp'}],
-        'startupProbe':{'exec':{'command':probe},'periodSeconds':5,'failureThreshold':30,'timeoutSeconds':3},
-        'readinessProbe':{'exec':{'command':probe},'periodSeconds':10,'timeoutSeconds':3},
-        'livenessProbe':{'exec':{'command':probe},'periodSeconds':30,'failureThreshold':3,'timeoutSeconds':3},
+        'startupProbe':{**probe,'periodSeconds':5,'failureThreshold':30,'timeoutSeconds':3},
+        'readinessProbe':{**probe,'periodSeconds':10,'timeoutSeconds':3},
+        'livenessProbe':{**probe,'periodSeconds':30,'failureThreshold':3,'timeoutSeconds':3},
     }
     items.append({'apiVersion':'apps/v1','kind':'Deployment','metadata':{'name':name,'namespace':args.namespace},
       'spec':{'replicas':1,'strategy':{'type':'Recreate'},'selector':{'matchLabels':labels},

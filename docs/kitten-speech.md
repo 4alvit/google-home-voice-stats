@@ -51,6 +51,10 @@ lists Apache-2.0 licensing. Preserve upstream attribution when redistributing.
 
 The model graph is about 24 MB, but the process needs substantially more RAM.
 The example deployment allows 768 MiB, one CPU, and a 64 MiB temporary filesystem.
+It requests 500 millicores for the primary and 100 for the secondary; override
+these with `--primary-cpu-millicores` and `--secondary-cpu-millicores` to fit the
+nodes. Reserve enough primary CPU for prompt replies under competing workloads.
+Health probes use HTTP directly rather than repeatedly starting Python processes.
 The temporary mount must permit executable mappings (`--tmpfs /tmp:size=64m,exec`
 for Docker): phonemizer copies its eSpeak shared library there before loading it.
 The Kubernetes memory-backed `emptyDir` has this behavior by default.
