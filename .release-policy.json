@@ -1,21 +1,64 @@
 {
   "repository": "4alvit/google-home-voice-stats",
-  "mode": "validation-only",
+  "mode": "release",
   "default_branch": "main",
   "validation_workflows": [
     "validate.yml",
     "test-adapter.yml",
     "codeql.yml",
     "dependency-review.yml",
-    "security.yml"
+    "security.yml",
+    "workflow-validation.yml"
   ],
   "local_checks": [
     "bash scripts/ci.sh"
   ],
   "notes": [
-    "Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.",
+    "Release payloads are installable source archives with integration templates and locked build requirements; no prebuilt image, hosted service, app-store admission or physical voice acceptance is implied.",
     "The callable/local adapter tests cover response handling and rendered Home Assistant configuration; config validation uses the existing HA 2026.9.2 container with offline fixtures. Install .[test], Docker, PyYAML and actionlint for the complete local check. No physical Nest speech or live IGW verification is implied.",
     "Quality gate is the sole push/PR entry point; reusable test workflows do not duplicate event-triggered runs."
   ],
-  "visibility": "public"
+  "visibility": "public",
+  "schema": 1,
+  "version_file": "pyproject.toml",
+  "artifact_pattern": "release-assets*",
+  "single_entry_ci": true,
+  "release_notes": "CHANGELOG.md",
+  "container_assets": {},
+  "versioning": {
+    "schema": 1,
+    "promotion": "promote-bytes",
+    "files": [
+      {
+        "path": "pyproject.toml",
+        "format": "toml",
+        "field": "project.version",
+        "package": "igw-google-voice",
+        "value": "package",
+        "ecosystem": "pep440"
+      },
+      {
+        "path": "igw_google_voice/__init__.py",
+        "format": "python",
+        "field": "__version__",
+        "value": "package",
+        "ecosystem": "pep440"
+      }
+    ],
+    "artifacts": [
+      {
+        "path": "google-home-voice-stats-*.tar.gz",
+        "format": "tar-toml",
+        "member": "google-home-voice-stats/pyproject.toml",
+        "field": "project.version",
+        "package": "igw-google-voice",
+        "value": "package",
+        "ecosystem": "pep440"
+      }
+    ],
+    "toolkit_revision": "685054a71f85d5e4cd727791027cc8b61d6ad8f6"
+  },
+  "fuzzing": {
+    "toolkit_ref": "685054a71f85d5e4cd727791027cc8b61d6ad8f6"
+  }
 }

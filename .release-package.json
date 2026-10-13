@@ -1,0 +1,15 @@
+{
+  "required": [
+    "igw_google_voice",
+    "pyproject.toml",
+    "blueprints",
+    "compose.cast.yaml",
+    "compose.piper.yaml",
+    "Dockerfile.cast",
+    "Dockerfile.kitten",
+    "requirements-cast.lock",
+    "requirements-piper.lock",
+    "requirements-kitten.lock",
+    ".github/requirements-build.txt"
+  ]
+}
