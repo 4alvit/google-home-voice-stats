@@ -1,0 +1,14 @@
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
+FROM ${PYTHON_IMAGE}
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
+    HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+WORKDIR /app
+COPY requirements-kitten.lock requirements-kitten-package.lock ./
+RUN pip install --require-hashes --only-binary=:all: -r requirements-kitten.lock && \
+    pip install --no-deps --require-hashes --only-binary=:all: -r requirements-kitten-package.lock
+COPY scripts/download-nano.py /tmp/download-nano.py
+RUN python /tmp/download-nano.py && rm /tmp/download-nano.py
+COPY igw_google_voice ./igw_google_voice
+RUN useradd --uid 10001 --no-create-home speech
+USER 10001:10001
+CMD ["python", "-m", "igw_google_voice.kitten_service"]

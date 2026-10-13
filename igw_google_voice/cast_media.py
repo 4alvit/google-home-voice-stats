@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import math
+import json
 import logging
 import sys
 import os
@@ -278,7 +279,20 @@ def _audio_duration(output_path: Path) -> float:
 
 
 def _speech(text: str, output_path: Path, espeak: str, *, provider: str,
-            model: str, timeout: int) -> tuple[float, str]:
+            model: str, timeout: int, kitten_endpoints: tuple[str, ...] = (),
+            kitten_token: str = "", kitten_timeout: int = 8,
+            kitten_ca_file: str = "") -> tuple[float, str]:
+    if provider == "kitten":
+        for index, endpoint in enumerate(kitten_endpoints):
+            name = "kitten_primary" if index == 0 else "kitten_secondary"
+            try:
+                _run([sys.executable, "-m", "igw_google_voice.kitten_client", str(output_path)],
+                     input_bytes=json.dumps({"endpoint": endpoint, "token": kitten_token,
+                                            "text": text, "ca_file": kitten_ca_file}).encode(), timeout=kitten_timeout)
+                return _audio_duration(output_path), name
+            except (RuntimeError, ValueError):
+                output_path.unlink(missing_ok=True)
+                LOG.warning("speech_fallback category=%s_unavailable", name)
     if provider == "piper":
         try:
             _run([sys.executable, "-m", "igw_google_voice.piper_worker", model, str(output_path)],
@@ -292,8 +306,10 @@ def _speech(text: str, output_path: Path, espeak: str, *, provider: str,
 
 def render_report_video(report_key: str, reports: dict[str, dict[str, str]],
                         output_path: Path, *, tts_provider: str = "espeak",
-                        piper_model: str = "", piper_timeout: int = 10) -> dict:
-    """Write an H.264/AAC MP4 without network calls or truncating gateway warnings.
+                        piper_model: str = "", piper_timeout: int = 10,
+                        kitten_endpoints: tuple[str, ...] = (), kitten_token: str = "",
+                        kitten_timeout: int = 8, kitten_ca_file: str = "") -> dict:
+    """Write an H.264/AAC MP4 without truncating gateway warnings.
 
     Status uses the optional central brief; other reports are spoken verbatim. Its text is passed only on stdin,
     never as executable arguments. Long visual reports continue across pages.
@@ -317,7 +333,9 @@ def render_report_video(report_key: str, reports: dict[str, dict[str, str]],
             spoken = reports[report_key]["text"]
         speech_duration, provider = _speech(spoken, audio_path, espeak,
                                             provider=tts_provider, model=piper_model,
-                                            timeout=piper_timeout)
+                                            timeout=piper_timeout, kitten_endpoints=kitten_endpoints,
+                                            kitten_token=kitten_token, kitten_timeout=kitten_timeout,
+                                            kitten_ca_file=kitten_ca_file)
         duration = max(speech_duration + READING_TAIL_SECONDS, len(pages) * 5.0)
         if duration > MAX_DURATION_SECONDS:
             raise ValueError("The visual report exceeds the media duration limit")

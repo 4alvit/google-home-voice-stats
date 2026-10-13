@@ -19,3 +19,12 @@ secrets.yaml
 # Local voice model artifacts are operator-managed, never repository assets.
 *.onnx
 *.onnx.json
+
+# Site-specific speech credentials and deployments
+speech-token
+*.private.json
+*.private.plist
+speech-tls/
+*.key
+*.csr
+*.srl

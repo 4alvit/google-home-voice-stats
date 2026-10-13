@@ -44,12 +44,17 @@ flowchart LR
 See [architecture.md](architecture.md) for the complete data path, alternative
 HA speech mode, credentials, playback lifecycle, optional automations and rollback.
 
+For CPU-only neural English speech with primary/secondary servers, see
+[KittenTTS Nano deployment and failover](docs/kitten-speech.md).
+
 ## Voice and screen experience
 
 - Default status speech uses IGW's optional brief overview, with the original
   detailed wording as a fallback. Full warning explanations remain on screen.
 - Large battery, solar and daily-generation values include units, status and
   gateway receipt age. This age describes arrival at IGW, not physical sampling time.
+- Optional **KittenTTS Nano** speech uses preloaded primary and secondary CPU
+  servers, with bounded requests and local eSpeak as the final fallback.
 - Optional local **Piper** speech uses an installed voice model on the NAS, with
   bounded execution and an eSpeak fallback. It adds no mandatory cloud speech
   subscription. Check the software/model licenses and benchmark your host first.
