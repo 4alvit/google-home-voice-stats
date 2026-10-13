@@ -153,6 +153,11 @@ the operator's entire certificate directory or its signing/private keys.
 
 ## Native Intel Mac primary
 
+The native service permits only an IPv4 loopback bind. NAS-to-Mac requests must
+use an encrypted SSH tunnel as described below. A private IP address and bearer
+token do not encrypt report text, audio or credentials. Do not expose port 8092
+on the Mac's LAN interface or forward it from a router.
+
 Measure the actual deployment host before selecting a format. On a tested older
 Intel Mac, a busy Linux VM took about 74 seconds to synthesize a 5.5-second
 sentence with INT8. Native macOS with FP32 and four threads reduced that to about
@@ -184,19 +189,56 @@ chmod 700 "$SPEECH_ROOT/tls"
 install -m 600 /PRIVATE/OPERATOR/PATH/speech-tls/primary.crt "$SPEECH_ROOT/tls/server.crt"
 install -m 600 /PRIVATE/OPERATOR/PATH/speech-tls/primary.key "$SPEECH_ROOT/tls/server.key"
 python3 scripts/render-kitten-launchd.py --root "$SPEECH_ROOT" \
-  --user "$(id -un)" --address MAC_PRIVATE_IP --threads 4 > primary.private.plist
+  --user "$(id -un)" --threads 4 > primary.private.plist
 plutil -lint primary.private.plist
 sudo install -o root -g wheel -m 644 primary.private.plist \
   /Library/LaunchDaemons/org.igw.kitten-primary.plist
 sudo launchctl bootstrap system /Library/LaunchDaemons/org.igw.kitten-primary.plist
 ```
 
-Use the same dedicated `speech-token` as the secondary. Point the first Cast
-endpoint to the physical Mac's private address, not its VM's address. `launchd`
-starts the service after reboot, retries if the private interface is not ready,
-and runs the process as the specified user. Logs remain in the private runtime
+Use the same dedicated `speech-token` as the secondary. `launchd` starts the
+service on `127.0.0.1:8092` after reboot and runs it as the specified user.
+Logs remain in the private runtime
 directory and do not include request text. Four threads are a parallelism bound,
 not a macOS CPU quota; choose fewer on a smaller or busier host.
+
+### Required NAS-to-Mac SSH tunnel
+
+Enable macOS Remote Login for the unprivileged service user and configure a
+dedicated SSH key for the NAS tunnel process. Verify the physical Mac's SSH host
+key through a separate trusted channel and provision it in that NAS user's
+`known_hosts` before starting the tunnel. Do not disable host-key checks.
+
+Run on the NAS, replacing `SPEECH_USER` and `MAC_PRIVATE_IP` with that user and
+the physical Mac's address:
+
+```sh
+ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes \
+  -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
+  -o ServerAliveCountMax=3 \
+  -L 127.0.0.1:18092:127.0.0.1:8092 SPEECH_USER@MAC_PRIVATE_IP
+```
+
+Configure the NAS service manager to run this command as an unprivileged user,
+start it after networking at boot, and restart it on exit. Both ends of the
+forward bind to loopback; SSH encrypts traffic crossing the network. The supplied
+Cast Compose service uses Linux host networking, so it can reach the NAS's
+loopback forward. A Cast process in another network namespace needs the tunnel
+in that same namespace; do not expose the forward on a LAN address.
+
+Replace the primary endpoint in the Cast environment:
+
+```dotenv
+CAST_KITTEN_ENDPOINTS=http://127.0.0.1:18092/v1/speech,http://SECONDARY_PRIVATE_IP:8092/v1/speech
+```
+
+Check `http://127.0.0.1:18092/healthz` from the NAS before recreating Cast. Verify
+that `http://MAC_PRIVATE_IP:8092/healthz` cannot be reached from the NAS. When the
+tunnel is stopped, the primary request must fail and normal secondary/eSpeak
+fallback applies; never substitute the Mac's LAN address as a fallback endpoint.
+For an existing installation, regenerate and reinstall the plist, then boot out
+and bootstrap the LaunchDaemon to replace its old LAN listener.
+
 If measured long-report timings require it, set `CAST_KITTEN_TIMEOUT=15` on the
 Cast client. This allows the server's twelve-second inference deadline plus
 connection and process overhead. The overall report freshness check still
