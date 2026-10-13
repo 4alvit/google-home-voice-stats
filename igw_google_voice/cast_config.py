@@ -83,7 +83,7 @@ class CastConfig:
                 raise ValueError()
             endpoints, speech_token = (), ""
             speech_timeout = int(env.get("CAST_KITTEN_TIMEOUT", "8"))
-            if not 1 <= speech_timeout <= 10:
+            if not 1 <= speech_timeout <= 15:
                 raise ValueError()
             if provider == "kitten":
                 endpoints = tuple(required("CAST_KITTEN_ENDPOINTS").split(","))

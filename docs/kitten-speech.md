@@ -14,7 +14,7 @@ Neither Home Assistant TTS, FCC nor Homeway participates in this speech path.
 3. If both fail, the existing local eSpeak voice reads the same report.
 
 Each remote attempt has an independent hard subprocess deadline (eight seconds
-by default, maximum ten). A partial response is removed before trying another
+by default, maximum fifteen). A partial response is removed before trying another
 provider. Redirects and environment HTTP proxies are not followed. The existing
 report freshness check still runs after rendering; failover never authorizes an
 outdated report. `/v1/status` reports `kitten_primary`, `kitten_secondary`, or
@@ -146,8 +146,10 @@ starts the service after reboot, retries if the private interface is not ready,
 and runs the process as the specified user. Logs remain in the private runtime
 directory and do not include request text. Four threads are a parallelism bound,
 not a macOS CPU quota; choose fewer on a smaller or busier host.
-If measured long-report timings require it, set `CAST_KITTEN_TIMEOUT=10` on the
-Cast client. The overall report freshness check still applies after rendering.
+If measured long-report timings require it, set `CAST_KITTEN_TIMEOUT=15` on the
+Cast client. This allows the server's twelve-second inference deadline plus
+connection and process overhead. The overall report freshness check still
+applies after rendering; a sufficiently slow failover is rejected as stale.
 
 To update, reinstall from the lock files, copy the updated package, verify the
 model hashes, then run `sudo launchctl kickstart -k system/org.igw.kitten-primary`.

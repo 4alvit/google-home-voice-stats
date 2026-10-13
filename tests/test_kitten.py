@@ -42,6 +42,10 @@ class KittenConfigTests(unittest.TestCase):
         config = CastConfig.from_env(env)
         self.assertEqual(len(config.kitten_endpoints), 2)
         self.assertNotIn('k' * 40, repr(config))
+        self.assertEqual(CastConfig.from_env(env | {'CAST_KITTEN_TIMEOUT':'15'}).kitten_timeout, 15)
+        for value in ('0', '16'):
+            with self.assertRaises(ValueError):
+                CastConfig.from_env(env | {'CAST_KITTEN_TIMEOUT':value})
         for endpoint in ['http://8.8.8.8:8092/v1/speech', 'http://user:pw@192.168.1.1:8092/v1/speech',
                          'http://192.168.1.1:8092/v1/speech?x=1','http://192.168.1.1:8092/wrong']:
             with self.subTest(endpoint=endpoint), self.assertRaises(ValueError):
