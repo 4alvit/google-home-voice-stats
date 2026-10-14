@@ -76,6 +76,7 @@ Renew the leaf and restart this deployment before expiry.
 ```sh
 umask 077
 python3 scripts/create-russian-speech-tls.py --output /PRIVATE/PATH/russian-tls
+kubectl create namespace igw-speech --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n igw-speech create secret generic russian-speech-token \
   --from-file=token=/PRIVATE/PATH/russian-tls/token
 kubectl -n igw-speech create secret tls russian-speech-tls \
@@ -226,6 +227,21 @@ NAS was unsuitable: warm startup took 124.5 seconds, the first short phrase took
 7.65 seconds, and the next report exceeded the 30-second worker deadline. The
 worker was observed waiting on disk I/O. This is why the deployment target must
 be measured independently; the M5 result is not a promise for a NAS or VM.
+
+The first Kubernetes pilot on a busy Xeon VM produced a short WAV through direct
+HTTPS in 3.68 seconds, but the adapter's 250-millicore container hit its unchanged
+30-second deadline. The host also showed slow process startup and high system
+CPU usage. A clean retry after removing a diagnostic process still timed out.
+This pilot was moved to an idle Intel Core i5-5300U NUC using the same immutable
+image, credentials, resource limits and request deadline.
+
+On that NUC, two simultaneous synthetic Wyoming requests completed in 4.10 and
+6.78 seconds, producing approximately 5.25 seconds of speech each. Private-CA
+HTTPS health, Wyoming voice discovery, and all 15 deployed application-file
+hashes were verified. The TTS and adapter containers used approximately 201 MiB
+and 19 MiB at the subsequent idle sample, with zero restarts. The existing Nano
+deployment and image stayed unchanged. These are one paired acceptance run and
+an idle resource sample, not a latency percentile or an acoustic quality score.
 
 As a secondary check, the synthetic energy clips were transcribed by the existing
 Parakeet recognizer. The Denis transcript preserved the four numeric values
