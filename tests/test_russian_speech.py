@@ -53,6 +53,17 @@ class AssetTests(unittest.TestCase):
                 verify_assets(root, 'piper')
             with self.assertRaises(ValueError):
                 verify_assets(root, 'unreviewed')
+            asset = Path(root) / 'piper' / 'test.bin'
+            asset.parent.mkdir()
+            asset.write_bytes(b'abc')
+            manifest = {'bundles': {'piper': {'files': [{'path': 'test.bin', 'size': 3,
+                'sha256': 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'}]}}}
+            with patch('igw_google_voice.russian_speech.json.loads', return_value=manifest):
+                verify_assets(root, 'piper')
+                for changed in (b'def', b'abcd'):
+                    asset.write_bytes(changed)
+                    with self.assertRaises(ValueError):
+                        verify_assets(root, 'piper')
 
     def test_bad_config_and_input_never_start_or_reload_a_worker(self):
         with patch.object(RussianSynthesizer, '_start') as start:

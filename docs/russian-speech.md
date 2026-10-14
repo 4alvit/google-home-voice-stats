@@ -33,7 +33,8 @@ HTTPS operation; disconnect cancels a waiting request or its active HTTP child.
 Audio writes have a separate 10-second bound. There are at most eight connected
 clients. HTTP inference also has a 30-second deadline and restarts its worker
 after a failure. Canceling a Wyoming caller does not immediately interrupt an
-already-running HTTP model invocation; the server deadline still bounds it. The adapter retries only explicit HTTP 503
+already-running HTTP model invocation; the server deadline still bounds it.
+The adapter retries only explicit HTTP 503
 busy responses with a bounded backoff inside the original request deadline, so
 a follow-up can wait for the canceled synthesis to release the worker.
 A direct HTTPS caller can contend with Wyoming and receive HTTP 503.
@@ -208,9 +209,8 @@ Denis in 0.74 seconds. The first short synthesis took 0.77 seconds; the warm rep
 took 0.055 seconds for 1.87 seconds of audio. A synthetic energy report produced
 12.6–12.8 seconds of audio in 0.32–0.33 seconds. A longer prose response took
 0.19–0.20 seconds. These are local model timings, not production SLA measurements
-or a claim of verified Russian pronunciation. Deployment-host measurements and
-Kitten2 results must be checked before choosing an interactive default.
-
+or a claim of verified Russian pronunciation. Measure the deployment host before
+choosing an interactive default.
 
 The same M5 Pro, using four CPU inference threads, loaded the pinned KittenTTS 2
 model in 21.69 seconds. Its first short phrase took 14.24 seconds for 2.08 seconds
@@ -220,3 +220,19 @@ Peak process RSS was approximately 7.21 GiB. This CPU implementation therefore
 remains an optional quality experiment, not the interactive default. A larger
 model alone did not provide an acceptable response latency on this host. These
 measurements do not establish performance of the separate C++ or GPU backends.
+
+A separate offline test in the same Piper image on a heavily contended two-core
+NAS was unsuitable: warm startup took 124.5 seconds, the first short phrase took
+7.65 seconds, and the next report exceeded the 30-second worker deadline. The
+worker was observed waiting on disk I/O. This is why the deployment target must
+be measured independently; the M5 result is not a promise for a NAS or VM.
+
+As a secondary check, the synthetic energy clips were transcribed by the existing
+Parakeet recognizer. The Denis transcript preserved the four numeric values
+(63, 1.5, 420 and 12.5), but omitted the watt unit after 420 and contained several
+word errors. The Kitten2 transcript repeated
+the solar-power clause and rendered the final decimal ambiguously. This is an
+ASR round-trip check, not a listening test: it cannot distinguish a synthesis
+error from a recognition error. Neither result establishes pronunciation
+quality. In particular, Kitten2 is not qualified for authoritative energy
+narration; review generated speech by ear before selecting either voice.
