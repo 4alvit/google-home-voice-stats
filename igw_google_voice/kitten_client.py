@@ -13,6 +13,11 @@ from .__main__ import local_http_host
 MAX_AUDIO = 6_000_000
 
 
+class SpeechBusy(ValueError):
+    """A retryable HTTP 503, distinct from authentication and audio failures."""
+
+
+
 def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
     if not 1 <= read_timeout <= 121:
         raise ValueError("invalid speech read timeout")
@@ -36,6 +41,8 @@ def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
         connection.request("POST", parsed.path, json.dumps({"text": text}).encode(), {
             "Authorization": "Bearer " + token, "Content-Type": "application/json"})
         response = connection.getresponse()
+        if response.status == 503:
+            raise SpeechBusy("speech worker busy")
         if response.status != 200 or response.getheader("Content-Type") != "audio/wav":
             raise ValueError("speech response rejected")
         if response.getheader("Content-Encoding") not in (None, "identity"):
@@ -63,6 +70,8 @@ def main():
             sys.stdout.buffer.write(data)
         else:
             Path(sys.argv[1]).write_bytes(data)
+    except SpeechBusy:
+        raise SystemExit(75) from None
     except Exception:
         raise SystemExit(1) from None
 

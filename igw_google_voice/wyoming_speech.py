@@ -90,6 +90,18 @@ class HTTPSProvider:
         self.config = config
 
     async def synthesize(self, text):
+        # A canceled caller can leave the HTTP model finishing its bounded work.
+        # Retry only explicit busy responses, within this original total budget.
+        delay = .1
+        async with asyncio.timeout(self.config.timeout):
+            while True:
+                result = await self._attempt(text)
+                if result is not None:
+                    return result
+                await asyncio.sleep(delay)
+                delay = min(.8, delay * 2)
+
+    async def _attempt(self, text):
         # A separate process makes cancellation bound the entire HTTPS operation,
         # including DNS, TLS and a server that dribbles bytes indefinitely.
         process = await asyncio.create_subprocess_exec(
@@ -98,8 +110,9 @@ class HTTPSProvider:
         request = dict(endpoint=self.config.endpoint, token=self.config.token, text=text,
                        ca_file=self.config.ca_file, read_timeout=self.config.timeout + 1)
         try:
-            async with asyncio.timeout(self.config.timeout):
-                output, _ = await process.communicate(json.dumps(request).encode())
+            output, _ = await process.communicate(json.dumps(request).encode())
+            if process.returncode == 75:
+                return None
             if process.returncode != 0 or not 0 < len(output) <= MAX_AUDIO:
                 raise RuntimeError('Speech provider failed')
             with wave.open(io.BytesIO(output), 'rb') as wav:

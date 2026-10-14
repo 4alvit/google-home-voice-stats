@@ -1,6 +1,12 @@
 """Russian number fidelity, pinned assets and the TTS-only Wyoming protocol."""
 import asyncio
 import json
+import io
+import subprocess
+import sys
+import threading
+import time
+import wave
 from pathlib import Path
 import tempfile
 import unittest
@@ -9,7 +15,8 @@ from unittest.mock import patch
 from wyoming.event import async_read_event, async_write_event, Event
 from igw_google_voice.russian_text import normalize_russian, number_words
 from igw_google_voice.russian_speech import RussianSynthesizer, verify_assets
-from igw_google_voice.wyoming_speech import Config, SpeechService, read_event
+from igw_google_voice.wyoming_speech import Config, SpeechService, HTTPSProvider, read_event
+from igw_google_voice.kitten_service import SpeechServer, BusyError, server_tls_context
 
 
 class RussianTextTests(unittest.TestCase):
@@ -144,10 +151,11 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         clients = [await self.connect() for _ in range(3)]
         for index, (reader, writer) in enumerate(clients):
             await async_write_event(Event(type='synthesize', data={'text': f'Ответ {index}.'}), writer)
-        for _ in range(20):
-            if self.service.admitted == 2:
-                break
-            await asyncio.sleep(.01)
+            if index < 2:
+                for _ in range(20):
+                    if self.service.admitted == index + 1:
+                        break
+                    await asyncio.sleep(.01)
         denied = await asyncio.wait_for(async_read_event(clients[2][0]), 1)
         self.assertEqual(denied.data['code'], 'unavailable')
         self.assertEqual(active, ['Ответ ноль.'])
@@ -202,18 +210,73 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.service.admitted, 0)
 
     async def test_queue_time_counts_toward_the_same_deadline(self):
+        began = asyncio.Event()
         async def slow(text):
+            began.set()
             await asyncio.sleep(.7)
             return b'\x01\x00' * 4800
         self.service.provider.synthesize = slow
         first, second = await self.connect(), await self.connect()
         for reader, writer in (first, second):
             await async_write_event(Event(type='synthesize', data={'text': 'Привет.'}), writer)
+            await asyncio.wait_for(began.wait(), .5)
         first_events = [await asyncio.wait_for(async_read_event(first[0]), 1.2) for _ in range(3)]
         self.assertEqual(first_events[-1].type, 'audio-stop')
         second_event = await asyncio.wait_for(async_read_event(second[0]), .6)
         self.assertEqual(second_event.data['code'], 'timeout')
         self.assertEqual(self.service.admitted, 0)
+
+    async def test_real_tls_busy_after_cancel_recovers_for_followup(self):
+        root = Path(self.directory.name) / 'real-tls'
+        subprocess.run([sys.executable, 'scripts/create-russian-speech-tls.py', '--output', str(root)],
+                       check=True, capture_output=True)
+        output = io.BytesIO()
+        with wave.open(output, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(24000)
+            wav.writeframes(b'\x01\x00' * 4800)
+        class Synth:
+            ready = threading.Event()
+            lock = threading.Lock()
+            began = threading.Event()
+            busy_count = 0
+            def generate(inner, text):
+                if not inner.lock.acquire(False):
+                    inner.busy_count += 1
+                    raise BusyError()
+                try:
+                    inner.began.set()
+                    time.sleep(.6)
+                    return output.getvalue()
+                finally:
+                    inner.lock.release()
+        synth = Synth()
+        synth.ready.set()
+        server = SpeechServer(('127.0.0.1', 0), synth, 't' * 40,
+                              tls_context=server_tls_context(root / 'server.crt', root / 'server.key'))
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addAsyncCleanup(asyncio.to_thread, server.shutdown)
+        config = Config(f'https://127.0.0.1:{server.server_port}/v1/speech', 't' * 40,
+                        str(root / 'ca.crt'), timeout=3)
+        self.service.config = config
+        self.service.provider = HTTPSProvider(config)
+        first_reader, first_writer = await self.connect()
+        await async_write_event(Event(type='synthesize', data={'text': 'Привет.'}), first_writer)
+        self.assertTrue(await asyncio.to_thread(synth.began.wait, 1))
+        first_writer.close()
+        await first_writer.wait_closed()
+        for _ in range(30):
+            if self.service.admitted == 0:
+                break
+            await asyncio.sleep(.01)
+        reader, writer = await self.connect()
+        await async_write_event(Event(type='synthesize', data={'text': 'Повтор.'}), writer)
+        events = [await asyncio.wait_for(async_read_event(reader), 3) for _ in range(3)]
+        self.assertEqual(events[-1].type, 'audio-stop')
+        self.assertGreater(synth.busy_count, 0)
 
     async def test_payload_and_bool_lengths_are_rejected(self):
         for header in ({'type': 'synthesize', 'payload_length': 1},

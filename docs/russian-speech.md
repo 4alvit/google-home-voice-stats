@@ -33,7 +33,9 @@ HTTPS operation; disconnect cancels a waiting request or its active HTTP child.
 Audio writes have a separate 10-second bound. There are at most eight connected
 clients. HTTP inference also has a 30-second deadline and restarts its worker
 after a failure. Canceling a Wyoming caller does not immediately interrupt an
-already-running HTTP model invocation; the server deadline still bounds it.
+already-running HTTP model invocation; the server deadline still bounds it. The adapter retries only explicit HTTP 503
+busy responses with a bounded backoff inside the original request deadline, so
+a follow-up can wait for the canceled synthesis to release the worker.
 A direct HTTPS caller can contend with Wyoming and receive HTTP 503.
 
 Text is limited to 1,200 characters before and after normalization. Output must
