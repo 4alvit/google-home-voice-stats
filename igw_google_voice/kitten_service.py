@@ -223,6 +223,8 @@ class SpeechHandler(BaseHTTPRequestHandler):
             return
         try:
             audio = self.server.synthesizer.generate(body["text"])
+        except ValueError:
+            self._send(400)
         except BusyError:
             self._send(503)
         except RuntimeError:

@@ -48,6 +48,8 @@ HA speech mode, credentials, playback lifecycle, optional automations and rollba
 
 For CPU-only neural English speech with primary/secondary servers, see
 [KittenTTS Nano deployment and failover](docs/kitten-speech.md).
+For an additive Russian Home Assistant voice and a larger-model experiment, see
+[Russian Piper and KittenTTS 2](docs/russian-speech.md).
 
 ## Voice and screen experience
 

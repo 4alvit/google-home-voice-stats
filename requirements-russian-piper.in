@@ -1,0 +1,6 @@
+# Optional CPU-only Russian baseline; does not affect the English Nano image.
+piper-tts==1.8.0
+onnxruntime==1.31.0
+numpy==2.4.6
+scipy==1.17.1
+wyoming==1.10.2

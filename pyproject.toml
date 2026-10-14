@@ -10,9 +10,10 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==12.3.0", "PyChromecast==14.0.10"]
+test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==12.3.0", "PyChromecast==14.0.10", "wyoming==1.10.2"]
 cast = ["PyChromecast==14.0.10", "Pillow==12.3.0"]
 piper = ["piper-tts==1.8.0"]
+russian-speech = ["wyoming==1.10.2"]
 
 [project.scripts]
 igw-google-voice = "igw_google_voice.__main__:main"
@@ -21,6 +22,9 @@ igw-cast-ha = "igw_google_voice.cast_ha:main"
 
 [tool.setuptools]
 packages = ["igw_google_voice"]
+
+[tool.setuptools.package-data]
+igw_google_voice = ["russian-speech-models.json"]
 
 [tool.setuptools.data-files]
 "share/igw-google-voice/blueprints/script/igw" = ["blueprints/script/igw/announce_energy.yaml"]

@@ -76,3 +76,24 @@ jobs:
             --security-opt no-new-privileges \
             -v "$PWD/tests/smoke_kitten.py:/app/smoke_kitten.py:ro" \
             igw-kitten-check python /app/smoke_kitten.py
+
+  russian:
+    name: Offline Russian Piper inference
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Build pinned Russian voice and synthesize offline
+        run: |
+          docker build -f Dockerfile.russian-speech -t igw-russian-check .
+          docker run --rm --network none --memory 1g --cpus 2 \
+            --read-only --tmpfs /tmp:size=64m,exec --cap-drop ALL \
+            --security-opt no-new-privileges \
+            -v "$PWD/tests/smoke_russian_speech.py:/app/smoke_russian_speech.py:ro" \
+            igw-russian-check python /app/smoke_russian_speech.py

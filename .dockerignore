@@ -17,3 +17,5 @@
 !requirements-kitten-package.lock
 !scripts/
 !scripts/download-nano.py
+!scripts/download-russian-speech.py
+!requirements-russian-piper.lock
