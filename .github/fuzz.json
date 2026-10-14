@@ -29,7 +29,28 @@
         "-max_len=4096"
       ],
       "seconds": 60,
-      "corpus": "fuzz/corpus/urls"
+      "corpus": "fuzz/corpus/urls",
+      "instrumentation": [
+        {
+          "module": "igw_google_voice.__main__",
+          "functions": [
+            "validate_url",
+            "local_http_host"
+          ]
+        }
+      ]
     }
+  ],
+  "preflight-paths": [
+    ".github/requirements-fuzz.in",
+    "fuzz",
+    "igw_google_voice",
+    "pyproject.toml",
+    "requirements-cast.lock",
+    "requirements-kitten-macos-intel.lock",
+    "requirements-kitten-package.lock",
+    "requirements-kitten.lock",
+    "requirements-piper.lock",
+    "requirements-test.lock"
   ]
 }
