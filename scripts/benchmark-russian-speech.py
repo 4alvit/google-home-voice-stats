@@ -36,6 +36,7 @@ def main():
         parser.error('Use 1–4 threads and 1–3 repetitions')
     if not 30 <= args.wall_timeout <= 1800:
         parser.error('Use a wall timeout of 30–1800 seconds')
+    os.umask(0o077)
     args.output.mkdir(parents=True, exist_ok=True)
     if not args.worker:
         child = subprocess.Popen([sys.executable, __file__, *sys.argv[1:], '--worker'], start_new_session=True)

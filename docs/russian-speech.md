@@ -122,11 +122,27 @@ Service to a public LoadBalancer is not an appropriate shortcut.
    A valid WAV and a green health probe do not establish natural pronunciation
    or acoustical quality on an Echo speaker.
 
+For a synthetic paired-request check from an operator machine, temporarily run
+`kubectl -n igw-speech port-forward service/russian-speech 10601:10601` in one
+terminal. In another, use an environment with the pinned `wyoming` dependency:
+
+```sh
+python scripts/probe-russian-speech.py --host 127.0.0.1 --port 10601 \
+  --output /PRIVATE/PATH/paired-check
+```
+
+The probe sends two identical synthetic requests together, verifies the PCM
+format, and saves their WAVs and timings privately. Stop the port forward after
+the check. It is a transport/inference check, not microphone or playback proof.
+
 Rollback means selecting the previous TTS provider/pipeline in HA first, then
 removing the added Deployment/Service and, if no longer needed, its three
 credential objects. Existing English Nano remains available throughout.
 
 ## Optional larger KittenTTS 2 experiment
+
+KittenTTS 2 attribution: **Powered by Stellon Labs**. Downloaded model files retain
+the upstream `LICENSE.md`; redistribution also requires the license’s Notice file.
 
 Use an isolated Python 3.11 environment; do not install these dependencies in
 the Nano runtime. The pinned manifest contains only the Russian voice assets,
@@ -194,3 +210,13 @@ took 0.055 seconds for 1.87 seconds of audio. A synthetic energy report produced
 0.19–0.20 seconds. These are local model timings, not production SLA measurements
 or a claim of verified Russian pronunciation. Deployment-host measurements and
 Kitten2 results must be checked before choosing an interactive default.
+
+
+The same M5 Pro, using four CPU inference threads, loaded the pinned KittenTTS 2
+model in 21.69 seconds. Its first short phrase took 14.24 seconds for 2.08 seconds
+of audio. After that, the synthetic energy report took 34.57 seconds for 17.60
+seconds of audio; the prose answer took 17.58 seconds for 7.32 seconds of audio.
+Peak process RSS was approximately 7.21 GiB. This CPU implementation therefore
+remains an optional quality experiment, not the interactive default. A larger
+model alone did not provide an acceptable response latency on this host. These
+measurements do not establish performance of the separate C++ or GPU backends.

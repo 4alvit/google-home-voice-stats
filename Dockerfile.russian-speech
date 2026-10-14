@@ -6,9 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
 WORKDIR /app
 COPY requirements-russian-piper.lock ./
 RUN pip install --require-hashes --only-binary=:all: -r requirements-russian-piper.lock
-COPY igw_google_voice ./igw_google_voice
+COPY igw_google_voice/russian-speech-models.json ./igw_google_voice/russian-speech-models.json
 COPY scripts/download-russian-speech.py ./scripts/download-russian-speech.py
 RUN python scripts/download-russian-speech.py --backend piper --output /models && \
     useradd --uid 10001 --no-create-home speech
+COPY igw_google_voice ./igw_google_voice
 USER 10001:10001
 CMD ["python", "-m", "igw_google_voice.russian_speech"]

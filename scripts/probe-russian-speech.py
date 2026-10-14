@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 import time
 import wave
@@ -60,6 +61,7 @@ def main():
     parser.add_argument('--port', type=int, default=10601)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    os.umask(0o077)
     args.output.mkdir(parents=True, exist_ok=True)
     rows = asyncio.run(run(args))
     (args.output / 'paired.private.json').write_text(json.dumps(rows, indent=2) + '\n')
