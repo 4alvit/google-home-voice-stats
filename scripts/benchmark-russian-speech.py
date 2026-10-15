@@ -14,6 +14,7 @@ import wave
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from igw_google_voice.russian_speech import RussianModel
+from igw_google_voice.russian_voices import VOICES, select_voice
 
 PHRASES = {
     'short': 'Четыре. Всё работает.',
@@ -25,6 +26,7 @@ PHRASES = {
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend', choices=('piper', 'kitten2'), required=True)
+    parser.add_argument('--voice', choices=VOICES)
     parser.add_argument('--model-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--threads', type=int, default=4)
@@ -32,6 +34,10 @@ def main():
     parser.add_argument('--wall-timeout', type=int, default=600)
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
+    try:
+        args.voice = select_voice(args.backend, args.voice)
+    except ValueError as error:
+        parser.error(str(error))
     if not 1 <= args.threads <= 4 or not 1 <= args.repeat <= 3:
         parser.error('Use 1–4 threads and 1–3 repetitions')
     if not 30 <= args.wall_timeout <= 1800:
@@ -48,8 +54,9 @@ def main():
             (args.output / 'deadline.private.json').write_text(json.dumps({'wall_timeout_seconds': args.wall_timeout}) + '\n')
             raise SystemExit('Benchmark exceeded its wall deadline; partial measurements were preserved')
     started = time.monotonic()
-    model = RussianModel(args.model_root, args.backend, args.threads)
-    report = {'backend': args.backend, 'threads': args.threads, 'load_seconds': time.monotonic() - started, 'samples': []}
+    model = RussianModel(args.model_root, args.backend, args.threads, args.voice)
+    report = {'backend': args.backend, 'voice': args.voice, 'threads': args.threads,
+              'load_seconds': time.monotonic() - started, 'samples': []}
     print(json.dumps({'load_seconds': report['load_seconds']}), flush=True)
     for name, phrase in PHRASES.items():
         for repeat in range(args.repeat):

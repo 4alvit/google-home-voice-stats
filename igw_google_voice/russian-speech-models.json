@@ -118,6 +118,27 @@
           "sha256": "8b5d685dd80f8ad3f8dbbe1c56b16bb0809f00c144af3642dbcf3b707eb89c12"
         }
       ]
+    },
+    "piper-irina": {
+      "repository": "rhasspy/piper-voices",
+      "revision": "c10ece1aade47bb51c153c893d14e5bf8e5b7117",
+      "files": [
+        {
+          "path": "ru/ru_RU/irina/medium/MODEL_CARD",
+          "size": 271,
+          "sha256": "f4fc2deb0e8c6219f29202b8dd06c9638c5ffd50ad5c6b2c90cf1aa59d507593"
+        },
+        {
+          "path": "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json",
+          "size": 4765,
+          "sha256": "c2ec28bb38e2b59e93b959b3e40348c1afebbd272f30fed5d41205d08e98a9d7"
+        },
+        {
+          "path": "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
+          "size": 63201294,
+          "sha256": "8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa"
+        }
+      ]
     }
   }
 }

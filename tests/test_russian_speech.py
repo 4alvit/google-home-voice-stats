@@ -15,6 +15,7 @@ from unittest.mock import patch
 from wyoming.event import async_read_event, async_write_event, Event
 from igw_google_voice.russian_text import normalize_russian, number_words
 from igw_google_voice.russian_speech import RussianSynthesizer, verify_assets
+from igw_google_voice.russian_voices import asset_bundles, select_voice
 from igw_google_voice.wyoming_speech import Config, SpeechService, HTTPSProvider, read_event
 from igw_google_voice.kitten_service import SpeechServer, BusyError, server_tls_context
 
@@ -47,6 +48,47 @@ class RussianTextTests(unittest.TestCase):
 
 
 class AssetTests(unittest.TestCase):
+    def test_voice_selection_preserves_defaults_and_rejects_cross_backend_names(self):
+        self.assertEqual(select_voice('piper'), 'piper-ru-denis')
+        self.assertEqual(select_voice('kitten2'), 'kitten2-russian')
+        self.assertEqual(asset_bundles('piper'), ('piper',))
+        self.assertEqual(asset_bundles('piper', 'piper-ru-irina'), ('piper-irina',))
+        for backend, voice in (('piper', 'kitten2-russian'), ('kitten2', 'piper-ru-irina'),
+                               ('piper', 'unreviewed'), ('piper', '')):
+            with self.subTest(backend=backend, voice=voice), self.assertRaises(ValueError):
+                select_voice(backend, voice)
+
+    def test_irina_is_verified_independently_and_never_falls_back_to_denis(self):
+        with tempfile.TemporaryDirectory() as root:
+            manifest = {'bundles': {name: {'files': [{'path': 'test.bin', 'size': 3,
+                'sha256': 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'}]}
+                for name in ('piper', 'piper-irina')}}
+            denis = Path(root) / 'piper' / 'test.bin'
+            denis.parent.mkdir()
+            denis.write_bytes(b'abc')
+            with patch('igw_google_voice.russian_speech.json.loads', return_value=manifest):
+                with self.assertRaises(FileNotFoundError):
+                    verify_assets(root, 'piper', 'piper-ru-irina')
+                irina = Path(root) / 'piper-irina' / 'test.bin'
+                irina.parent.mkdir()
+                irina.write_bytes(b'abc')
+                denis.write_bytes(b'bad')
+                verify_assets(root, 'piper', 'piper-ru-irina')
+                irina.write_bytes(b'bad')
+                with self.assertRaises(ValueError):
+                    verify_assets(root, 'piper', 'piper-ru-irina')
+
+    def test_renderer_keeps_inference_and_discovery_voice_in_sync(self):
+        for voice in ('piper-ru-denis', 'piper-ru-irina'):
+            result = subprocess.run([sys.executable, 'scripts/render-russian-speech.py',
+                '--node', 'test-node', '--image', 'registry.example/speech@sha256:' + 'a' * 64,
+                '--voice', voice], check=True, capture_output=True, text=True)
+            containers = json.loads(result.stdout)['items'][0]['spec']['template']['spec']['containers']
+            self.assertEqual(len(containers), 2)
+            for container in containers:
+                env = {item['name']: item['value'] for item in container['env']}
+                self.assertEqual(env['RUSSIAN_SPEECH_VOICE'], voice)
+
     def test_missing_or_changed_asset_is_refused_before_loading_a_model(self):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaises(FileNotFoundError):
@@ -67,11 +109,13 @@ class AssetTests(unittest.TestCase):
 
     def test_bad_config_and_input_never_start_or_reload_a_worker(self):
         with patch.object(RussianSynthesizer, '_start') as start:
-            for options in ({'backend': 'unknown'}, {'timeout': 121}, {'threads': 8}):
+            for options in ({'backend': 'unknown'}, {'timeout': 121}, {'threads': 8},
+                            {'voice': 'kitten2-russian'}, {'voice': 'unreviewed'}):
                 with self.assertRaises(ValueError):
                     RussianSynthesizer('/unused', **options)
             start.assert_not_called()
             synth = RussianSynthesizer('/unused')
+            self.assertEqual(synth.voice, 'piper-ru-denis')
             with patch.object(synth, 'close') as close, self.assertRaises(ValueError):
                 synth.generate('<laugh>')
             close.assert_not_called()
@@ -128,6 +172,23 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(event.type, 'error')
             self.assertEqual(event.data['code'], 'invalid-request')
         self.assertEqual(self.calls, [])
+
+    async def test_irina_discovery_accepts_irina_and_rejects_old_voice_name(self):
+        self.service.config = Config(self.config.endpoint, self.config.token,
+                                     self.config.ca_file, voice='piper-ru-irina', timeout=1)
+        reader, writer = await self.connect()
+        await async_write_event(Event(type='describe'), writer)
+        info = await asyncio.wait_for(async_read_event(reader), 2)
+        self.assertEqual([v['name'] for v in info.data['tts'][0]['voices']], ['piper-ru-irina'])
+        await async_write_event(Event(type='synthesize', data={'text': 'Я готова.',
+            'voice': {'name': 'piper-ru-irina', 'language': 'ru'}}), writer)
+        events = [await asyncio.wait_for(async_read_event(reader), 2) for _ in range(3)]
+        self.assertEqual(events[-1].type, 'audio-stop')
+        await async_write_event(Event(type='synthesize', data={'text': 'Я готова.',
+            'voice': {'name': 'piper-ru-denis'}}), writer)
+        error = await asyncio.wait_for(async_read_event(reader), 2)
+        self.assertEqual(error.data['code'], 'invalid-request')
+        self.assertEqual(self.calls, ['Я готова.'])
 
     async def test_disconnect_cancels_request_and_releases_lease(self):
         began = asyncio.Event()

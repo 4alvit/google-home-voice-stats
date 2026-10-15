@@ -13,19 +13,16 @@ import wave
 
 from .kitten_service import SpeechServer, Synthesizer, server_tls_context
 from .russian_text import normalize_russian
+from .russian_voices import BACKENDS, PIPER_VOICES, asset_bundles, select_voice
 
 RATE = 24000
-BACKENDS = ('kitten2', 'piper')
-PIPER_PATH = 'piper/ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx'
 
 
-def verify_assets(root, backend):
+def verify_assets(root, backend, voice=None):
     """Refuse changed/incomplete weights, including pickled codec components."""
     root = Path(root).resolve(strict=True)
     manifest = json.loads(Path(__file__).with_name('russian-speech-models.json').read_text())
-    selected = ('kitten2', 'codec') if backend == 'kitten2' else ('piper',)
-    if backend not in BACKENDS:
-        raise ValueError('Unknown Russian speech backend')
+    selected = asset_bundles(backend, voice)
     for bundle in selected:
         for item in manifest['bundles'][bundle]['files']:
             path = (root / bundle / item['path']).resolve(strict=True)
@@ -59,8 +56,9 @@ def to_wav(samples, rate):
 
 
 class RussianModel:
-    def __init__(self, root, backend, threads=4):
-        verify_assets(root, backend)
+    def __init__(self, root, backend, threads=4, voice=None):
+        self.voice = select_voice(backend, voice)
+        verify_assets(root, backend, self.voice)
         root = Path(root).resolve()
         self.backend = backend
         if backend == 'kitten2':
@@ -83,7 +81,8 @@ class RussianModel:
             from piper import PiperVoice
             from piper.config import PiperConfig
             ort.disable_telemetry_events()
-            path = root / PIPER_PATH
+            bundle, model_path = PIPER_VOICES[self.voice]
+            path = root / bundle / model_path
             config = json.loads(Path(str(path) + '.json').read_text())
             if config.get('phoneme_type', 'espeak') != 'espeak' or config.get('num_speakers') != 1 or config.get('espeak', {}).get('voice') != 'ru':
                 raise ValueError('Expected the reviewed Russian eSpeak voice')
@@ -112,7 +111,7 @@ class RussianModel:
                           wav.getframerate())
 
 
-def russian_worker(connection, root, threads, backend):
+def russian_worker(connection, root, threads, backend, voice):
     # Libraries may print prompts. Silence only this expendable inference child.
     with open(os.devnull, 'w') as null:
         os.dup2(null.fileno(), 1)
@@ -121,7 +120,7 @@ def russian_worker(connection, root, threads, backend):
                       TRANSFORMERS_OFFLINE='1', TOKENIZERS_PARALLELISM='false',
                       OMP_NUM_THREADS=str(threads), OPENBLAS_NUM_THREADS='1')
     try:
-        model = RussianModel(root, backend, threads)
+        model = RussianModel(root, backend, threads, voice)
         model.generate('Готово.')
         connection.send(True)
         while True:
@@ -143,10 +142,11 @@ def russian_worker(connection, root, threads, backend):
 
 
 class RussianSynthesizer(Synthesizer):
-    def __init__(self, model_dir, backend='piper', timeout=30, threads=4):
+    def __init__(self, model_dir, backend='piper', timeout=30, threads=4, voice=None):
         if backend not in BACKENDS or not 1 <= timeout <= 120:
             raise ValueError('Invalid Russian speech configuration')
         self.backend = backend
+        self.voice = select_voice(backend, voice)
         super().__init__(model_dir, timeout=timeout, threads=threads)
 
     def _start(self):
@@ -155,7 +155,7 @@ class RussianSynthesizer(Synthesizer):
         parent, child = context.Pipe()
         self.connection = parent
         self.process = context.Process(target=russian_worker,
-                                       args=(child, self.model_dir, self.threads, self.backend), daemon=True)
+                                       args=(child, self.model_dir, self.threads, self.backend, self.voice), daemon=True)
         self.process.start()
         child.close()
         if not parent.poll(180) or parent.recv() is not True:
@@ -177,6 +177,7 @@ def main():
     context = server_tls_context(os.environ['KITTEN_TLS_CERT_FILE'], os.environ['KITTEN_TLS_KEY_FILE'])
     synth = RussianSynthesizer(os.environ['RUSSIAN_MODEL_ROOT'],
                                backend=os.environ.get('RUSSIAN_TTS_BACKEND', 'piper'),
+                               voice=os.environ.get('RUSSIAN_SPEECH_VOICE'),
                                timeout=float(os.environ.get('RUSSIAN_TTS_TIMEOUT', '30')),
                                threads=int(os.environ.get('KITTEN_THREADS', '4')))
     server = None

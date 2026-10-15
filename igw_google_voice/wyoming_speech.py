@@ -17,6 +17,7 @@ from wyoming.info import Attribution, Info, TtsProgram, TtsVoice
 
 from .kitten_client import MAX_AUDIO
 from .russian_text import normalize_russian
+from .russian_voices import VOICES
 
 VERSION = '0.1.0'
 
@@ -40,7 +41,7 @@ class Config:
             raise ValueError('Invalid speech credential')
         if not Path(self.ca_file).is_absolute() or not Path(self.ca_file).is_file():
             raise ValueError('Expected an installed private CA file')
-        if self.voice not in ('piper-ru-denis', 'kitten2-russian') or not 1 <= self.timeout <= 120:
+        if self.voice not in VOICES or not 1 <= self.timeout <= 120:
             raise ValueError('Invalid speech voice/deadline')
 
     @classmethod

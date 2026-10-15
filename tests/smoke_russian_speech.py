@@ -1,5 +1,6 @@
 """Run in the Piper image without network access; uses only synthetic text."""
 import io
+import os
 import time
 import wave
 from igw_google_voice.russian_speech import RussianSynthesizer
@@ -7,7 +8,10 @@ from igw_google_voice.russian_speech import RussianSynthesizer
 
 def main():
     started = time.monotonic()
-    synth = RussianSynthesizer('/models', backend='piper', threads=2, timeout=30)
+    synth = RussianSynthesizer(os.environ.get('RUSSIAN_MODEL_ROOT', '/models'),
+                               backend='piper', threads=2, timeout=30,
+                               voice=os.environ.get('RUSSIAN_SPEECH_VOICE'))
+    print(f'Voice: {synth.voice}', flush=True)
     print(f'Warm startup: {time.monotonic() - started:.3f}s', flush=True)
     try:
         for text in ('Четыре. Всё работает.', 'Батарея заряжена на 63%. Дом потребляет 420 Вт.'):

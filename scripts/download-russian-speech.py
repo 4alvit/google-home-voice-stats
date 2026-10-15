@@ -6,6 +6,10 @@ import hashlib
 import json
 from pathlib import Path
 import urllib.request
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from igw_google_voice.russian_voices import BACKENDS, VOICES, asset_bundles
 
 
 def download(root, bundle, specification, item):
@@ -43,10 +47,14 @@ def download(root, bundle, specification, item):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    parser.add_argument('--backend', choices=('kitten2', 'piper'), required=True)
+    parser.add_argument('--backend', choices=BACKENDS, required=True)
+    parser.add_argument('--voice', choices=VOICES, help='Defaults to Denis for Piper, Russian for KittenTTS 2')
     args = parser.parse_args()
     manifest = json.loads((Path(__file__).resolve().parents[1] / 'igw_google_voice/russian-speech-models.json').read_text())
-    selected = ('kitten2', 'codec') if args.backend == 'kitten2' else ('piper',)
+    try:
+        selected = asset_bundles(args.backend, args.voice)
+    except ValueError as error:
+        parser.error(str(error))
     jobs = [(name, manifest['bundles'][name], item) for name in selected
             for item in manifest['bundles'][name]['files']]
     with ThreadPoolExecutor(max_workers=3) as executor:

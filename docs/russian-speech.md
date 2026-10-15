@@ -6,15 +6,18 @@ image, voice, endpoints, or Cast defaults. Speech synthesis does not supply Home
 Assistant tools, energy facts, speech recognition, or wake-word detection; those
 remain separate parts of the voice pipeline.
 
-The deployed baseline is **Piper Denis medium**, a small CPU model. **KittenTTS 2**
-is a larger, optional quality experiment. Do not select the larger model as the
+The Piper service supports **Denis medium** and **Irina medium** (female Russian
+speech). Both are small CPU models. Denis remains the default for existing
+deployments; Irina is selected explicitly. **KittenTTS 2** is a larger, optional
+quality experiment. Do not select the larger model as the
 interactive default merely because it supports Russian: measure its latency and
 listen to the actual output first.
 
 ## Request path and limits
 
 Home Assistant's Wyoming integration sends Russian text to TCP port `10601`.
-The adapter advertises `Local Russian Speech`, voice `piper-ru-denis`, and languages
+The adapter advertises `Local Russian Speech`, the selected voice (`piper-ru-denis`
+or `piper-ru-irina`), and languages
 `ru` and `ru-RU`. It calls a private authenticated HTTPS `/v1/speech` endpoint,
 then returns mono 24 kHz 16-bit PCM in Wyoming audio events. The HTTP contract
 remains `{"text":"..."}` to `audio/wav`, allowing the same service to be used by a
@@ -52,14 +55,17 @@ are rejected; this endpoint accepts plain speech text only.
 
 ## Build and deploy an additive baseline
 
-The image embeds hash-verified Denis weights. It needs no model downloads at
-runtime. Build for the target node's architecture and push to a private registry:
+The image embeds hash-verified Denis and Irina weights, including their original
+model cards. It needs no model downloads at runtime. Only the selected voice is
+loaded into memory. Build for the target node's architecture and push to a
+private registry:
 
 ```sh
 docker build -f Dockerfile.russian-speech -t REGISTRY/russian-speech:VERSION .
 docker run --rm --network none --memory 1g --cpus 2 \
   --read-only --tmpfs /tmp:size=64m,exec --cap-drop ALL \
   --security-opt no-new-privileges \
+  -e RUSSIAN_SPEECH_VOICE=piper-ru-irina \
   -v "$PWD/tests/smoke_russian_speech.py:/app/smoke_russian_speech.py:ro" \
   REGISTRY/russian-speech:VERSION python /app/smoke_russian_speech.py
 docker push REGISTRY/russian-speech:VERSION
@@ -85,6 +91,7 @@ kubectl -n igw-speech create secret tls russian-speech-tls \
 kubectl -n igw-speech create configmap russian-speech-ca \
   --from-file=ca.crt=/PRIVATE/PATH/russian-tls/ca.crt
 python3 scripts/render-russian-speech.py --node YOUR_NODE \
+  --voice piper-ru-irina \
   --image REGISTRY/russian-speech@sha256:YOUR_MANIFEST_DIGEST \
   > /PRIVATE/PATH/russian-speech.json
 kubectl apply -f /PRIVATE/PATH/russian-speech.json
@@ -100,6 +107,33 @@ carry no credentials. Authorized HTTPS clients receive the token and public CA c
 The server private key stays in the server Secret; the CA signing key is never
 deployed.
 
+The renderer writes `RUSSIAN_SPEECH_VOICE` to **both** the `tts` and `wyoming`
+containers. That single choice controls the loaded model and the advertised
+voice name; do not change only the advertisement. An unknown voice or a
+Piper/KittenTTS mismatch fails startup. Each selected model and its JSON/card are
+verified independently before loading; missing Irina assets never fall back to
+Denis. A Wyoming request naming a different voice is rejected, so HA's pipeline
+must be updated after a voice change.
+
+For a private download or benchmark without a container:
+
+```sh
+python3 scripts/download-russian-speech.py --backend piper \
+  --voice piper-ru-irina --output /PRIVATE/PATH/models
+python3 scripts/benchmark-russian-speech.py --backend piper \
+  --voice piper-ru-irina --model-root /PRIVATE/PATH/models \
+  --output /PRIVATE/PATH/irina-benchmark --threads 2
+```
+
+The [Irina model card](https://huggingface.co/rhasspy/piper-voices/blob/c10ece1aade47bb51c153c893d14e5bf8e5b7117/ru/ru_RU/irina/medium/MODEL_CARD)
+identifies RHVoice as the dataset source and lists its license as **Unknown**.
+The repository-level license is not evidence of permission to redistribute this
+voice's dataset or weights. Keep built images/model files in the private registry;
+the public source repository contains the downloader and pinned checksums only.
+Both voices use immutable upstream revision
+`c10ece1aade47bb51c153c893d14e5bf8e5b7117`; Irina's ONNX SHA-256 is
+`8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa`.
+
 Wyoming itself has no TLS or authentication. Keep its ClusterIP reachable only
 from trusted workloads/HA, using the cluster's network policies if other tenants
 share the network. Do not expose port `10601` to the Internet. A Home Assistant
@@ -114,7 +148,7 @@ Service to a public LoadBalancer is not an appropriate shortcut.
    reachable private service address through the established trusted route.
 2. In **Settings → Voice assistants**, create or edit an Assist pipeline. Set
    its language to Russian, choose the existing Russian-capable speech-to-text
-   and conversation providers, and choose **Local Russian Speech / piper-ru-denis**
+   and conversation providers, and choose **Local Russian Speech / piper-ru-irina**
    for text-to-speech. Do not change wake words as part of this operation.
 3. First test the TTS entity with synthetic Russian text in Developer Tools.
    Then test the complete Assist pipeline and select it for each satellite.
@@ -140,6 +174,22 @@ the check. It is a transport/inference check, not microphone or playback proof.
 Rollback means selecting the previous TTS provider/pipeline in HA first, then
 removing the added Deployment/Service and, if no longer needed, its three
 credential objects. Existing English Nano remains available throughout.
+
+For an existing service changing from Denis to Irina, save the current Deployment
+and Assist pipeline configuration privately first. Deploy the image containing
+both voices with `--voice piper-ru-irina`, wait for full HTTP readiness, and perform
+a synthetic synthesis. Reload the existing Wyoming integration so HA refreshes
+its voice list, then set the pipeline's TTS voice to `piper-ru-irina`. Keep the same
+STT/conversation engines, language, wake word and per-device pipeline assignment.
+Repeat for other pipelines using this same TTS entity; otherwise they still ask
+for Denis and receive an error. To roll back the voice, change **both** containers
+to `piper-ru-denis`, reload Wyoming, and restore the matching HA voice selection.
+The bundled Denis model is available without a new download.
+
+Voice timbre and grammatical gender are separate settings. If the conversation
+agent should refer to itself in the feminine form, update its prompt explicitly
+(for example, `«Я готова»` or `«Я поняла»`) while preserving its tool and privacy
+rules. TTS itself does not rewrite answers or alter home-control permissions.
 
 ## Optional larger KittenTTS 2 experiment
 
@@ -188,8 +238,10 @@ request to the locally verified codec, preventing resolution of mutable Hub
 
 Piper's runtime is GPL-3.0; the pinned Denis model card identifies its dataset as
 CC0. Preserve runtime and model notices when redistributing an image. The
-runtime license and a voice model's terms are different things; Denis was chosen
-instead of a voice whose card listed unknown licensing.
+runtime license and a voice model's terms are different things. Denis was the
+initial baseline with a documented dataset license. The optional Irina model's
+card lists unknown dataset licensing; retain its card and keep its weights and
+built image private, as described above.
 
 KittenTTS source and weights have different licenses. KittenTTS 2 weights use the
 Stellon Labs community license, not the Apache license associated with the old
