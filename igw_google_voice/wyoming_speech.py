@@ -7,6 +7,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import sys
 import wave
 
@@ -14,12 +15,15 @@ from wyoming.audio import AudioStart, AudioChunk, AudioStop
 from wyoming.error import Error
 from wyoming.event import Event, async_write_event
 from wyoming.info import Attribution, Info, TtsProgram, TtsVoice
+from wyoming.tts import SynthesizeStopped
 
 from .kitten_client import MAX_AUDIO
-from .russian_text import normalize_russian
+from .russian_text import MAX_TEXT, normalize_russian
 from .russian_voices import VOICES
 
-VERSION = '0.1.0'
+VERSION = '0.2.0'
+STREAM_TIMEOUT = 120
+SENTENCE_END = re.compile(r'(?<=[.!?…])\s+')
 
 
 @dataclass(frozen=True)
@@ -56,7 +60,7 @@ def service_info(config):
     attribution = Attribution(name='IGW Russian Speech', url='https://github.com/4alvit/google-home-voice-stats')
     return Info(tts=[TtsProgram(name='Local Russian Speech', description='Private Russian speech; no cloud inference',
                                attribution=attribution, installed=True, version=VERSION,
-                               supports_synthesize_streaming=False,
+                               supports_synthesize_streaming=True,
                                voices=[TtsVoice(name=config.voice, description='Russian local voice',
                                                 attribution=attribution, installed=True, version=VERSION,
                                                 languages=['ru', 'ru-RU'])])])
@@ -69,7 +73,8 @@ async def read_event(reader):
     if len(line) > 4096 or not line.endswith(b'\n'):
         raise ValueError('Invalid event')
     header = json.loads(line)
-    if not isinstance(header, dict) or header.get('type') not in ('describe', 'synthesize'):
+    if not isinstance(header, dict) or header.get('type') not in (
+            'describe', 'synthesize', 'synthesize-start', 'synthesize-chunk', 'synthesize-stop'):
         raise ValueError('Invalid event')
     length = header.get('data_length', 0)
     payload = header.get('payload_length', 0)
@@ -137,6 +142,97 @@ class SpeechService:
         self.admitted = 0
         self.connections = 0
 
+    def validate_voice(self, event):
+        voice = event.data.get('voice') or {}
+        if (not isinstance(voice, dict) or voice.get('name') not in (None, '', self.config.voice)
+                or voice.get('language') not in (None, '', 'ru', 'ru-RU')
+                or voice.get('speaker') is not None
+                or event.data.get('text_format') not in (None, '', 'text')):
+            raise ValueError('Invalid voice')
+
+    async def stream(self, reader, writer):
+        """Synthesize complete sentences while HA continues sending text.
+
+        One bounded reader owns the socket, including disconnect detection after
+        synthesize-stop. The shared model lock is held only during inference.
+        HA's compatibility synthesize event is checked, never spoken twice.
+        """
+        if self.admitted >= 2:
+            raise RuntimeError('busy')
+        self.admitted += 1
+        sentences = asyncio.Queue()
+
+        async def receive():
+            text = pending = ''
+            compatibility_seen = False
+            for _ in range(4096):
+                event = await read_event(reader)
+                if event is None:
+                    raise ConnectionError('Client disconnected')
+                if event.type == 'synthesize-chunk' and not compatibility_seen:
+                    chunk = event.data.get('text')
+                    if not isinstance(chunk, str) or len(text) + len(chunk) > MAX_TEXT:
+                        raise ValueError('Invalid streamed text')
+                    text += chunk
+                    pending += chunk
+                    if text.strip():
+                        normalize_russian(text)  # Same input policy as a complete request.
+                    while match := SENTENCE_END.search(pending):
+                        sentence, pending = pending[:match.start()], pending[match.end():]
+                        if sentence.strip():
+                            sentences.put_nowait(normalize_russian(sentence))
+                elif event.type == 'synthesize' and not compatibility_seen:
+                    self.validate_voice(event)
+                    if event.data.get('text') != text:
+                        raise ValueError('Stream compatibility text differs')
+                    compatibility_seen = True
+                elif event.type == 'synthesize-stop':
+                    normalize_russian(text)  # Reject an empty stream as well.
+                    if pending.strip():
+                        sentences.put_nowait(normalize_russian(pending))
+                    sentences.put_nowait(None)
+                    # Keep cancellation prompt while the last sentences render.
+                    await reader.read(1)
+                    raise ConnectionError('Client ended or pipelined the stream')
+                else:
+                    raise ValueError('Invalid stream event order')
+            raise ValueError('Too many stream events')
+
+        async def speak():
+            started = False
+            total_bytes = 0
+            while (text := await sentences.get()) is not None:
+                async with asyncio.timeout(self.config.timeout):
+                    async with self.serial:
+                        pcm = await self.provider.synthesize(text)
+                total_bytes += len(pcm)
+                if not pcm or len(pcm) % 2 or total_bytes > 24000 * 2 * 115:
+                    raise RuntimeError('Invalid audio')
+                if not started:
+                    await async_write_event(AudioStart(rate=24000, width=2, channels=1).event(), writer)
+                    started = True
+                for offset in range(0, len(pcm), 9600):
+                    await async_write_event(AudioChunk(rate=24000, width=2, channels=1,
+                                                       audio=pcm[offset:offset + 9600]).event(), writer)
+            await async_write_event(AudioStop().event(), writer)
+            await async_write_event(SynthesizeStopped().event(), writer)
+
+        receiving = asyncio.create_task(receive())
+        speaking = asyncio.create_task(speak())
+        try:
+            async with asyncio.timeout(STREAM_TIMEOUT):
+                done, _ = await asyncio.wait((receiving, speaking), return_when=asyncio.FIRST_COMPLETED)
+                # A malformed/disconnected input takes precedence over completion.
+                if receiving in done:
+                    await receiving
+                await speaking
+        finally:
+            for task in (receiving, speaking):
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(receiving, speaking, return_exceptions=True)
+            self.admitted -= 1
+
     async def request(self, reader, text):
         # At most one active synthesis and one waiting caller. A single deadline
         # covers queue wait and inference, and disconnect cancels either stage.
@@ -174,11 +270,12 @@ class SpeechService:
                 if event.type == 'describe':
                     await asyncio.wait_for(async_write_event(service_info(self.config).event(), writer), 5)
                     continue
-                voice = event.data.get('voice') or {}
-                if (not isinstance(voice, dict) or voice.get('name') not in (None, '', self.config.voice)
-                        or voice.get('language') not in (None, '', 'ru', 'ru-RU')
-                        or voice.get('speaker') is not None or event.data.get('text_format') not in (None, '', 'text')):
-                    raise ValueError('Invalid voice')
+                self.validate_voice(event)
+                if event.type == 'synthesize-start':
+                    await self.stream(reader, writer)
+                    continue
+                if event.type != 'synthesize':
+                    raise ValueError('Expected synthesis request')
                 text = normalize_russian(event.data.get('text'))
                 pcm = await self.request(reader, text)
                 if not pcm or len(pcm) % 2 or len(pcm) > 24000 * 2 * 115:

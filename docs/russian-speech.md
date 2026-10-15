@@ -30,17 +30,19 @@ becomes ready. The example runs one inference worker, two CPU threads, and a
 startup probe budget of approximately 200 seconds. A healthy TCP listener alone
 is not proof of working speech: test a complete synthesis after deployment.
 
-Wyoming admits at most **one active request and one waiting request**. A third
-is rejected. The default 30-second deadline covers both queue wait and the full
-HTTPS operation; disconnect cancels a waiting request or its active HTTP child.
-Audio writes have a separate 10-second bound. There are at most eight connected
-clients. HTTP inference also has a 30-second deadline and restarts its worker
-after a failure. Canceling a Wyoming caller does not immediately interrupt an
+Wyoming admits at most **two requests**, with one model inference at a time.
+A third is rejected. For a complete-text request, the default 30-second deadline
+covers queue wait and the full HTTPS operation; audio writes have a separate
+10-second bound. For a streaming request, that inference deadline applies to
+each sentence, with a 120-second limit for the entire connection's stream,
+including incoming text and outgoing audio. There are at most eight connected
+clients. Disconnect cancels waiting work or the active HTTP child.
+HTTP inference also has a 30-second deadline and restarts its worker after a
+failure. Canceling a Wyoming caller does not immediately interrupt an
 already-running HTTP model invocation; the server deadline still bounds it.
-The adapter retries only explicit HTTP 503
-busy responses with a bounded backoff inside the original request deadline, so
-a follow-up can wait for the canceled synthesis to release the worker.
-A direct HTTPS caller can contend with Wyoming and receive HTTP 503.
+The adapter retries only explicit HTTP 503 busy responses with bounded backoff
+inside the inference deadline. A direct HTTPS caller can contend with Wyoming
+and receive HTTP 503.
 
 Text is limited to 1,200 characters before and after normalization. Output must
 be finite mono audio, at most 115 seconds. Logs contain fixed failure categories,
@@ -52,6 +54,36 @@ spellings). This preserves values such as `-0.25 kW` rather than rounding them.
 It is not a general-purpose date, time, currency or abbreviation normalizer.
 Callers should produce unambiguous Russian prose. Markup/control instructions
 are rejected; this endpoint accepts plain speech text only.
+
+## Speak while the answer is still being generated
+
+Adapter version `0.2.0` advertises Wyoming `supports_synthesize_streaming`.
+It accepts `synthesize-start`, successive `synthesize-chunk` events, the optional
+full-text compatibility `synthesize` event, and `synthesize-stop`. It synthesizes
+sentences ending in punctuation followed by whitespace as soon as they arrive.
+The final unfinished sentence is flushed at stop. A decimal point inside a
+number is not a sentence boundary. Text without sentence boundaries still waits
+for completion; this is sentence streaming, not token-by-token audio synthesis.
+
+The compatibility event must match the accumulated chunks exactly and is never
+spoken a second time. One audio stream contains one `audio-start`, the PCM for
+all sentences, `audio-stop`, then `synthesize-stopped`. Existing complete-text
+Wyoming and HTTPS clients remain supported. The same selected voice, local
+inference, text validation, admission limits, and cancellation policy apply.
+
+Deploy the updated immutable image and reload **Local Russian Speech** under
+**Settings → Devices & services → Wyoming Protocol** so HA refreshes advertised
+capabilities. Keep the selected voice unchanged. The conversation agent must
+also support streaming. On EchoMuse, enable **Stream reply**; that switch alone
+cannot turn a complete-text TTS server into a streaming server.
+
+Validate with a synthetic sentence and deliberately delay sending the rest:
+audio must arrive before the final text and stop event. Then inspect a real HA
+Assist run: `run-start` should contain a streaming TTS output, and fetching that
+stream should return PCM before `intent-end` for a sufficiently long generated
+answer. Do not equate a successful URL or WAV header with audible early speech.
+Test two concurrent callers and interruption/disconnect. Roll back by disabling
+**Stream reply**, or restore the previous adapter image and reload Wyoming.
 
 ## Build and deploy an additive baseline
 
@@ -304,3 +336,18 @@ ASR round-trip check, not a listening test: it cannot distinguish a synthesis
 error from a recognition error. Neither result establishes pronunciation
 quality. In particular, Kitten2 is not qualified for authoritative energy
 narration; review generated speech by ear before selecting either voice.
+
+### Streaming validation — October 14, 2026
+
+Adapter 0.2.0 passed 23 targeted tests including partial decimal input,
+compatibility-event deduplication, invalid event order, disconnect cancellation
+and idle-stream timeout. A separate deployment using the actual Irina model
+served two concurrent synthetic streams: audio began in 2.22 and 4.74 seconds,
+before the final text was sent. Application hashes matched the built snapshot.
+
+After deployment and Wyoming reload, a real Home Assistant run with the local
+conversation agent returned its first MP3 audio payload at 20.275 seconds and
+finished generating six Russian sentences at 53.753 seconds. The complete
+stream was retrieved without errors. The delay before the first sentence is
+still model-dependent. These are server-side measurements, not acoustic
+microphone-to-speaker timings.

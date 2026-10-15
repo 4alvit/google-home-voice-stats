@@ -152,6 +152,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         await async_write_event(Event(type='describe'), writer)
         info = await asyncio.wait_for(async_read_event(reader), 2)
         voice = info.data['tts'][0]['voices'][0]
+        self.assertTrue(info.data['tts'][0]['supports_synthesize_streaming'])
         self.assertEqual(voice['languages'], ['ru', 'ru-RU'])
         self.assertEqual(voice['name'], 'piper-ru-denis')
         await async_write_event(Event(type='synthesize', data={'text': 'Батарея 63%.', 'voice': {'language': 'ru'}}), writer)
@@ -189,6 +190,82 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         error = await asyncio.wait_for(async_read_event(reader), 2)
         self.assertEqual(error.data['code'], 'invalid-request')
         self.assertEqual(self.calls, ['Я готова.'])
+
+    async def test_stream_speaks_before_input_ends_and_never_duplicates_full_text(self):
+        reader, writer = await self.connect()
+        await async_write_event(Event(type='synthesize-start', data={'voice': {'language': 'ru'}}), writer)
+        # A decimal and its unit can span multiple input chunks.
+        for chunk in ('Мощность 1.', '5 кВт. ', 'Батарея '):
+            await async_write_event(Event(type='synthesize-chunk', data={'text': chunk}), writer)
+        first = [await asyncio.wait_for(async_read_event(reader), 1) for _ in range(2)]
+        self.assertEqual([e.type for e in first], ['audio-start', 'audio-chunk'])
+        self.assertEqual(self.calls, [normalize_russian('Мощность 1.5 кВт.')])
+        await async_write_event(Event(type='synthesize-chunk', data={'text': '63%.'}), writer)
+        await async_write_event(Event(type='synthesize', data={'text': 'Мощность 1.5 кВт. Батарея 63%.'}), writer)
+        await async_write_event(Event(type='synthesize-stop'), writer)
+        tail = [await asyncio.wait_for(async_read_event(reader), 1) for _ in range(3)]
+        self.assertEqual([e.type for e in tail], ['audio-chunk', 'audio-stop', 'synthesize-stopped'])
+        self.assertEqual(self.calls, [normalize_russian('Мощность 1.5 кВт.'),
+                                     normalize_russian('Батарея 63%.')])
+
+    async def test_stream_without_compatibility_event_flushes_last_sentence(self):
+        reader, writer = await self.connect()
+        for kind, data in [('synthesize-start', {}), ('synthesize-chunk', {'text': 'Я готова'}),
+                           ('synthesize-stop', {})]:
+            await async_write_event(Event(type=kind, data=data), writer)
+        events = [await asyncio.wait_for(async_read_event(reader), 1) for _ in range(4)]
+        self.assertEqual([e.type for e in events],
+                         ['audio-start', 'audio-chunk', 'audio-stop', 'synthesize-stopped'])
+        self.assertEqual(self.calls, ['Я готова'])
+
+    async def test_invalid_streams_do_not_synthesize(self):
+        cases = [
+            [('synthesize-chunk', {'text': 'x' * 1201})],
+            [('synthesize-chunk', {'text': 'Текст'}), ('synthesize', {'text': 'Другой'})],
+            [('synthesize-stop', {})],
+            [('synthesize-start', {})],
+            [('synthesize-chunk', {'text': '<speak>Текст</speak>'})],
+        ]
+        for events in cases:
+            reader, writer = await self.connect()
+            await async_write_event(Event(type='synthesize-start'), writer)
+            for kind, data in events:
+                await async_write_event(Event(type=kind, data=data), writer)
+            error = await asyncio.wait_for(async_read_event(reader), 1)
+            self.assertEqual(error.type, 'error')
+            self.assertEqual(error.data['code'], 'invalid-request')
+        self.assertEqual(self.calls, [])
+
+    async def test_stream_disconnect_cancels_inference_after_input_stop(self):
+        began, cancelled = asyncio.Event(), asyncio.Event()
+        async def blocked(text):
+            began.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+        self.service.provider.synthesize = blocked
+        reader, writer = await self.connect()
+        for kind, data in [('synthesize-start', {}), ('synthesize-chunk', {'text': 'Привет.'}),
+                           ('synthesize-stop', {})]:
+            await async_write_event(Event(type=kind, data=data), writer)
+        await asyncio.wait_for(began.wait(), 1)
+        writer.close()
+        await writer.wait_closed()
+        await asyncio.wait_for(cancelled.wait(), 1)
+        for _ in range(20):
+            if self.service.admitted == 0:
+                break
+            await asyncio.sleep(.01)
+        self.assertEqual(self.service.admitted, 0)
+
+    async def test_idle_stream_deadline_releases_admission(self):
+        with patch('igw_google_voice.wyoming_speech.STREAM_TIMEOUT', .05):
+            reader, writer = await self.connect()
+            await async_write_event(Event(type='synthesize-start'), writer)
+            error = await asyncio.wait_for(async_read_event(reader), 1)
+        self.assertEqual(error.data['code'], 'timeout')
+        self.assertEqual(self.service.admitted, 0)
 
     async def test_disconnect_cancels_request_and_releases_lease(self):
         began = asyncio.Event()
