@@ -13,6 +13,10 @@ quality experiment. Do not select the larger model as the
 interactive default merely because it supports Russian: measure its latency and
 listen to the actual output first.
 
+**Silero Baya** (`silero-ru-baya`) is an additional female Russian voice, using
+the pinned `v5_6_ru` model. It runs on CPU in a separate image and uses the same
+bounded HTTPS and Wyoming interfaces. See [Baya setup and rollback](silero-baya.md).
+
 ## Request path and limits
 
 Home Assistant's Wyoming integration sends Russian text to TCP port `10601`.

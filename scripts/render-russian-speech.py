@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render an additive Piper HTTPS/HA Wyoming deployment without credentials."""
+"""Render a local Russian HTTPS/HA Wyoming deployment without credentials."""
 import argparse
 import json
 import re
@@ -9,7 +9,7 @@ parser.add_argument('--namespace', default='igw-speech')
 parser.add_argument('--name', default='russian-speech')
 parser.add_argument('--node', required=True)
 parser.add_argument('--image', required=True)
-parser.add_argument('--voice', choices=('piper-ru-denis', 'piper-ru-irina'), default='piper-ru-denis')
+parser.add_argument('--voice', choices=('piper-ru-denis', 'piper-ru-irina', 'silero-ru-baya'), default='piper-ru-denis')
 args = parser.parse_args()
 for value in (args.namespace, args.name, args.node):
     if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?', value):
@@ -20,6 +20,7 @@ labels = {'app.kubernetes.io/name': args.name}
 security = {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}
 token = {'name': 'token', 'mountPath': '/run/speech', 'readOnly': True}
 env = [{'name': 'KITTEN_TOKEN_FILE', 'value': '/run/speech/token'},
+       {'name': 'RUSSIAN_TTS_BACKEND', 'value': 'silero' if args.voice == 'silero-ru-baya' else 'piper'},
        {'name': 'RUSSIAN_SPEECH_VOICE', 'value': args.voice}]
 tts = {'name': 'tts', 'image': args.image, 'securityContext': security,
        'env': env + [{'name': 'KITTEN_BIND_HOST', 'value': '0.0.0.0'},

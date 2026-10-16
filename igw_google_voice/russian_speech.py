@@ -13,7 +13,7 @@ import wave
 
 from .kitten_service import SpeechServer, Synthesizer, server_tls_context
 from .russian_text import normalize_russian
-from .russian_voices import BACKENDS, PIPER_VOICES, asset_bundles, select_voice
+from .russian_voices import BACKENDS, PIPER_VOICES, SILERO_VOICES, asset_bundles, select_voice
 
 RATE = 24000
 
@@ -61,7 +61,18 @@ class RussianModel:
         verify_assets(root, backend, self.voice)
         root = Path(root).resolve()
         self.backend = backend
-        if backend == 'kitten2':
+        if backend == 'silero':
+            import torch
+            torch.set_num_threads(threads)
+            torch.set_num_interop_threads(1)
+            torch.manual_seed(42)
+            bundle, model_path, self.speaker = SILERO_VOICES[self.voice]
+            # Package loading executes model code: verify_assets must precede it.
+            self.model = torch.package.PackageImporter(str(root / bundle / model_path)).load_pickle('tts_models', 'model')
+            self.model.to(torch.device('cpu'))
+            if self.speaker not in self.model.speakers:
+                raise ValueError('Reviewed speaker missing from the Silero model')
+        elif backend == 'kitten2':
             import torch
             from unittest.mock import patch
             from kittenml import KittenTTS
@@ -96,6 +107,11 @@ class RussianModel:
     def generate(self, text):
         import numpy as np
         text = normalize_russian(text)
+        if self.backend == 'silero':
+            import torch
+            with torch.inference_mode():
+                samples = self.model.apply_tts(text=text, speaker=self.speaker, sample_rate=RATE)
+            return to_wav(samples.detach().cpu().numpy(), RATE)
         if self.backend == 'kitten2':
             samples = self.model.generate(text, voice='Russian', normalize=False,
                                           preset='stable', max_new_tokens=1000,

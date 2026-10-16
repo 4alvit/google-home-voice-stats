@@ -100,3 +100,11 @@ jobs:
               -v "$PWD/tests/smoke_russian_speech.py:/app/smoke_russian_speech.py:ro" \
               igw-russian-check python /app/smoke_russian_speech.py
           done
+      - name: Build Baya and verify offline authenticated speech
+        run: |
+          docker build -f Dockerfile.russian-silero -t igw-baya-check .
+          docker run --rm --network none --memory 1g --cpus 2 \
+            --read-only --tmpfs /tmp:size=64m,exec --cap-drop ALL \
+            --security-opt no-new-privileges \
+            -v "$PWD/tests/smoke_russian_speech.py:/app/smoke_russian_speech.py:ro" \
+            igw-baya-check python /app/smoke_russian_speech.py

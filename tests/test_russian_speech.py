@@ -51,10 +51,13 @@ class AssetTests(unittest.TestCase):
     def test_voice_selection_preserves_defaults_and_rejects_cross_backend_names(self):
         self.assertEqual(select_voice('piper'), 'piper-ru-denis')
         self.assertEqual(select_voice('kitten2'), 'kitten2-russian')
+        self.assertEqual(select_voice('silero'), 'silero-ru-baya')
+        self.assertEqual(asset_bundles('silero', 'silero-ru-baya'), ('silero',))
         self.assertEqual(asset_bundles('piper'), ('piper',))
         self.assertEqual(asset_bundles('piper', 'piper-ru-irina'), ('piper-irina',))
         for backend, voice in (('piper', 'kitten2-russian'), ('kitten2', 'piper-ru-irina'),
-                               ('piper', 'unreviewed'), ('piper', '')):
+                               ('piper', 'unreviewed'), ('piper', ''),
+                               ('piper', 'silero-ru-baya'), ('silero', 'piper-ru-irina')):
             with self.subTest(backend=backend, voice=voice), self.assertRaises(ValueError):
                 select_voice(backend, voice)
 
@@ -79,7 +82,7 @@ class AssetTests(unittest.TestCase):
                     verify_assets(root, 'piper', 'piper-ru-irina')
 
     def test_renderer_keeps_inference_and_discovery_voice_in_sync(self):
-        for voice in ('piper-ru-denis', 'piper-ru-irina'):
+        for voice in ('piper-ru-denis', 'piper-ru-irina', 'silero-ru-baya'):
             result = subprocess.run([sys.executable, 'scripts/render-russian-speech.py',
                 '--node', 'test-node', '--image', 'registry.example/speech@sha256:' + 'a' * 64,
                 '--voice', voice], check=True, capture_output=True, text=True)
@@ -88,6 +91,8 @@ class AssetTests(unittest.TestCase):
             for container in containers:
                 env = {item['name']: item['value'] for item in container['env']}
                 self.assertEqual(env['RUSSIAN_SPEECH_VOICE'], voice)
+                self.assertEqual(env['RUSSIAN_TTS_BACKEND'],
+                                 'silero' if voice == 'silero-ru-baya' else 'piper')
 
     def test_missing_or_changed_asset_is_refused_before_loading_a_model(self):
         with tempfile.TemporaryDirectory() as root:
@@ -190,6 +195,25 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         error = await asyncio.wait_for(async_read_event(reader), 2)
         self.assertEqual(error.data['code'], 'invalid-request')
         self.assertEqual(self.calls, ['Я готова.'])
+
+    async def test_baya_discovery_synthesizes_russian_and_refuses_stale_irina(self):
+        self.service.config = Config(self.config.endpoint, self.config.token,
+                                     self.config.ca_file, voice='silero-ru-baya', timeout=1)
+        reader, writer = await self.connect()
+        await async_write_event(Event(type='describe'), writer)
+        info = await asyncio.wait_for(async_read_event(reader), 2)
+        self.assertEqual([v['name'] for v in info.data['tts'][0]['voices']], ['silero-ru-baya'])
+        self.assertTrue(info.data['tts'][0]['supports_synthesize_streaming'])
+        await async_write_event(Event(type='synthesize', data={'text': 'Батарея 63%.',
+            'voice': {'name': 'silero-ru-baya', 'language': 'ru'}}), writer)
+        events = [await asyncio.wait_for(async_read_event(reader), 2) for _ in range(3)]
+        self.assertEqual(events[-1].type, 'audio-stop')
+        self.assertEqual(self.calls, ['Батарея шестьдесят три процента.'])
+        await async_write_event(Event(type='synthesize', data={'text': 'Привет!',
+            'voice': {'name': 'piper-ru-irina'}}), writer)
+        error = await asyncio.wait_for(async_read_event(reader), 2)
+        self.assertEqual(error.data['code'], 'invalid-request')
+        self.assertEqual(len(self.calls), 1)
 
     async def test_stream_speaks_before_input_ends_and_never_duplicates_full_text(self):
         reader, writer = await self.connect()

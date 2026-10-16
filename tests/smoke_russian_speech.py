@@ -1,4 +1,4 @@
-"""Run in the Piper image without network access; uses only synthetic text."""
+"""Run in a Russian speech image without network; uses only synthetic text."""
 import io
 import ipaddress
 from pathlib import Path
@@ -21,7 +21,7 @@ from igw_google_voice.russian_speech import RussianSynthesizer
 def main():
     started = time.monotonic()
     synth = RussianSynthesizer(os.environ.get('RUSSIAN_MODEL_ROOT', '/models'),
-                               backend='piper', threads=2, timeout=30,
+                               backend=os.environ.get('RUSSIAN_TTS_BACKEND', 'piper'), threads=2, timeout=30,
                                voice=os.environ.get('RUSSIAN_SPEECH_VOICE'))
     print(f'Voice: {synth.voice}', flush=True)
     print(f'Warm startup: {time.monotonic() - started:.3f}s', flush=True)
