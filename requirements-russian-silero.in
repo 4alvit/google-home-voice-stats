@@ -1,0 +1,6 @@
+# CPU-only Python 3.11 Linux image; no GPU runtime or cloud synthesis.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.14.1+cpu
+numpy==2.4.6
+scipy==1.17.1
+wyoming==1.10.2

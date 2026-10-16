@@ -141,11 +141,11 @@ class Synthesizer:
 
 class SpeechServer(ThreadingHTTPServer):
     daemon_threads = True
-    def __init__(self, address, synthesizer, token, *, tls_context):
+    def __init__(self, address, synthesizer, token, *, tls_context, handler_class=None):
         self.synthesizer, self.token = synthesizer, token
         self.tls_context = tls_context
         self.slots = threading.BoundedSemaphore(8)
-        super().__init__(address, SpeechHandler)
+        super().__init__(address, handler_class or SpeechHandler)
 
     def process_request(self, request, client_address):
         if not self.slots.acquire(False):

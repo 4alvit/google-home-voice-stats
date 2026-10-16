@@ -139,6 +139,25 @@
           "sha256": "8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa"
         }
       ]
+    },
+    "silero": {
+      "repository": "snakers4/silero-models",
+      "revision": "e382298387332f2bf461fe6eadfde99104611b0c",
+      "license": "CC-BY-NC-SA-4.0",
+      "files": [
+        {
+          "path": "v5_6_ru.pt",
+          "url": "https://models.silero.ai/models/tts/ru/v5_6_ru.pt",
+          "size": 147664410,
+          "sha256": "04cc9b1d08ce38bcaa9d02c488d80d3e6806d17f7eaa7c95982f36a3cbf50b2e"
+        },
+        {
+          "path": "LICENSE",
+          "url": "https://raw.githubusercontent.com/snakers4/silero-models/e382298387332f2bf461fe6eadfde99104611b0c/LICENSE",
+          "size": 20849,
+          "sha256": "1349a4b6148492b44f629e64eed676612e234fe9a839e4f3b277c1482c8849f1"
+        }
+      ]
     }
   }
 }

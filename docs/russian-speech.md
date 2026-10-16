@@ -13,11 +13,17 @@ quality experiment. Do not select the larger model as the
 interactive default merely because it supports Russian: measure its latency and
 listen to the actual output first.
 
+**Silero Baya** (`silero-ru-baya`) is an additional female Russian voice, using
+the pinned `v5_6_ru` model. It runs on CPU in a separate image and uses the same
+bounded HTTPS and Wyoming interfaces. The same pinned model also supplies
+Kseniya, Xenia, Aidar and Eugene. See [Baya setup, live settings and rollback](silero-baya.md).
+
 ## Request path and limits
 
 Home Assistant's Wyoming integration sends Russian text to TCP port `10601`.
-The adapter advertises `Local Russian Speech`, the selected voice (`piper-ru-denis`
-or `piper-ru-irina`), and languages
+The adapter advertises `Local Russian Speech`; Piper advertises its selected
+voice (`piper-ru-denis` or `piper-ru-irina`), while Silero advertises all five
+installed speakers plus `silero-ru-default`. Both advertise languages
 `ru` and `ru-RU`. It calls a private authenticated HTTPS `/v1/speech` endpoint,
 then returns mono 24 kHz 16-bit PCM in Wyoming audio events. The HTTP contract
 remains `{"text":"..."}` to `audio/wav`, allowing the same service to be used by a

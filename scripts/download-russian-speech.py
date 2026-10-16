@@ -26,8 +26,12 @@ def download(root, bundle, specification, item):
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(target.name + '.partial')
-    url = ('https://huggingface.co/' + specification['repository'] + '/resolve/'
-           + specification['revision'] + '/' + item['path'])
+    url = item.get('url')
+    if url is None:
+        url = ('https://huggingface.co/' + specification['repository'] + '/resolve/'
+               + specification['revision'] + '/' + item['path'])
+    if not url.startswith('https://'):
+        raise ValueError('Reviewed asset URL must use HTTPS')
     try:
         with open_download(url, timeout=60) as source, temporary.open('wb') as output:
             total = 0
