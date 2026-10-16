@@ -1,3 +1,3 @@
 """Read-only IGW reports for Cast displays and optional Home Assistant adapters."""
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
