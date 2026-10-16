@@ -13,7 +13,14 @@ from .__main__ import local_http_host
 MAX_AUDIO = 6_000_000
 
 
-def fetch_audio(endpoint, token, text, ca_file):
+class SpeechBusy(ValueError):
+    """A retryable HTTP 503, distinct from authentication and audio failures."""
+
+
+
+def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
+    if not 1 <= read_timeout <= 121:
+        raise ValueError("invalid speech read timeout")
     parsed = urlsplit(endpoint)
     # Enforce TLS here too: callers must never send credentials over plain HTTP.
     if (parsed.scheme != "https" or not parsed.hostname
@@ -28,12 +35,14 @@ def fetch_audio(endpoint, token, text, ca_file):
                                              timeout=2, context=context)
     try:
         connection.connect()
-        # The parent enforces the configured total budget (at most fifteen seconds).
+        # The parent enforces its total budget, including connection setup.
         # Allow the server's twelve-second inference budget plus response overhead.
-        connection.sock.settimeout(13)
+        connection.sock.settimeout(read_timeout)
         connection.request("POST", parsed.path, json.dumps({"text": text}).encode(), {
             "Authorization": "Bearer " + token, "Content-Type": "application/json"})
         response = connection.getresponse()
+        if response.status == 503:
+            raise SpeechBusy("speech worker busy")
         if response.status != 200 or response.getheader("Content-Type") != "audio/wav":
             raise ValueError("speech response rejected")
         if response.getheader("Content-Encoding") not in (None, "identity"):
@@ -55,8 +64,14 @@ def fetch_audio(endpoint, token, text, ca_file):
 def main():
     try:
         request = json.loads(sys.stdin.buffer.read(16384))
-        data = fetch_audio(request["endpoint"], request["token"], request["text"], request["ca_file"])
-        Path(sys.argv[1]).write_bytes(data)
+        data = fetch_audio(request["endpoint"], request["token"], request["text"], request["ca_file"],
+                           read_timeout=request.get("read_timeout", 13))
+        if sys.argv[1] == "-":
+            sys.stdout.buffer.write(data)
+        else:
+            Path(sys.argv[1]).write_bytes(data)
+    except SpeechBusy:
+        raise SystemExit(75) from None
     except Exception:
         raise SystemExit(1) from None
 

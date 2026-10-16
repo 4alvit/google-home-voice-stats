@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "bundles": {
+    "kitten2": {
+      "repository": "KittenML/kitten-tts-2",
+      "revision": "f2eee74f4467855ad58fe16f1fb7b7df473263fd",
+      "files": [
+        {
+          "path": "LICENSE.md",
+          "size": 12478,
+          "sha256": "f2429d9172b1e192102ab07552d7ca86c981f13598cbe3b51cc1fbd94604e1a3"
+        },
+        {
+          "path": "config.json",
+          "size": 2196,
+          "sha256": "19dfbdd98697acefe35c8cfb2e36c1416f06ede378797b2ee9413c9c4b42fb21"
+        },
+        {
+          "path": "lm/added_tokens.json",
+          "size": 157239,
+          "sha256": "f757d3b2e5381b23765a7177bb76afd6f44f3ac8e9eb585fc39333e4769001f3"
+        },
+        {
+          "path": "lm/config.json",
+          "size": 1359,
+          "sha256": "91378d01ae13755f130e3b714abfe57e8a48d15a88fc0d3a1414f30af76d3f2b"
+        },
+        {
+          "path": "lm/generation_config.json",
+          "size": 214,
+          "sha256": "d3e057bbca66b92f33a8bdc6a1301014e0e4ab69b3b3fd2e442d9fe0c69f3431"
+        },
+        {
+          "path": "lm/merges.txt",
+          "size": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "path": "lm/model-ternary.safetensors",
+          "size": 954467780,
+          "sha256": "8dd6cc318c16cbb177dd44d92521955d3abaa84a8910aae9ffb312c5ae920054"
+        },
+        {
+          "path": "lm/special_tokens_map.json",
+          "size": 450,
+          "sha256": "a67cddf2259d77b5021cfa9a5608e60779f19c4828567b2ae46604f23fc0c569"
+        },
+        {
+          "path": "lm/tokenizer.json",
+          "size": 12649770,
+          "sha256": "99644fcf19a9aff57b247b4e56fffe878c65d9c230d21a46caf9acf8f54d31d7"
+        },
+        {
+          "path": "lm/tokenizer_config.json",
+          "size": 1166768,
+          "sha256": "ce07c343b7bb1d9b822475beb46e39b3883706bfb5bbc3d080142ccd321beea3"
+        },
+        {
+          "path": "lm/vocab.json",
+          "size": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        },
+        {
+          "path": "speaker/LICENSE",
+          "size": 1061,
+          "sha256": "14d7016ad68e7394d6e6b78d96cc2ae431c905287b89674cfdf021e79e62b8ba"
+        },
+        {
+          "path": "speaker/model.safetensors",
+          "size": 17418240,
+          "sha256": "c435292860671aa96e94bd19fcea055241c8ef05548e1e441a659b2bfd79fad5"
+        },
+        {
+          "path": "voices/voices.json",
+          "size": 18117,
+          "sha256": "dc09cf430769bc470cc990feac674325cb341ba7afa1225f38b16648535d99e6"
+        },
+        {
+          "path": "voices/ru_russian.npz",
+          "size": 3532,
+          "sha256": "1303a75952015e0accfca8c6f76233610cdcd0d1943244662dfe6b77878cef2d"
+        },
+        {
+          "path": "voices/ru_russian.wav",
+          "size": 455118,
+          "sha256": "a7ce899d85323ca4b51eec343cc2058ebcbf8eac838d65680019661add124d3c"
+        }
+      ]
+    },
+    "codec": {
+      "repository": "ResembleAI/chatterbox-turbo",
+      "revision": "749d1c1a46eb10492095d68fbcf55691ccf137cd",
+      "files": [
+        {
+          "path": "s3gen_meanflow.safetensors",
+          "size": 1064875036,
+          "sha256": "d65cb687a2ed581ee6cc297e919ffefa63386944f42364ae13b78a594945514f"
+        }
+      ]
+    },
+    "piper": {
+      "repository": "rhasspy/piper-voices",
+      "revision": "c10ece1aade47bb51c153c893d14e5bf8e5b7117",
+      "files": [
+        {
+          "path": "ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx",
+          "size": 63201294,
+          "sha256": "15fab56e11a097858ee115545d0f697fc2a316c41a291a5362349fb870411b0a"
+        },
+        {
+          "path": "ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx.json",
+          "size": 4823,
+          "sha256": "831c860dac0b5073eaa81610a0a638ec23d90a6cf8e5f871b4485c2cec3767c8"
+        },
+        {
+          "path": "ru/ru_RU/denis/medium/MODEL_CARD",
+          "size": 276,
+          "sha256": "8b5d685dd80f8ad3f8dbbe1c56b16bb0809f00c144af3642dbcf3b707eb89c12"
+        }
+      ]
+    },
+    "piper-irina": {
+      "repository": "rhasspy/piper-voices",
+      "revision": "c10ece1aade47bb51c153c893d14e5bf8e5b7117",
+      "files": [
+        {
+          "path": "ru/ru_RU/irina/medium/MODEL_CARD",
+          "size": 271,
+          "sha256": "f4fc2deb0e8c6219f29202b8dd06c9638c5ffd50ad5c6b2c90cf1aa59d507593"
+        },
+        {
+          "path": "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json",
+          "size": 4765,
+          "sha256": "c2ec28bb38e2b59e93b959b3e40348c1afebbd272f30fed5d41205d08e98a9d7"
+        },
+        {
+          "path": "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
+          "size": 63201294,
+          "sha256": "8ff38212d23da300bbe3705c645e6e5b9475f0bfde01558eb17813e22acaaaaa"
+        }
+      ]
+    }
+  }
+}

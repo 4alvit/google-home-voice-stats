@@ -1,0 +1,17 @@
+ARG PYTHON_IMAGE=python:3.11-slim-bookworm@sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89
+FROM ${PYTHON_IMAGE}
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
+    HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 \
+    RUSSIAN_MODEL_ROOT=/models RUSSIAN_TTS_BACKEND=piper
+WORKDIR /app
+COPY requirements-russian-piper.lock ./
+RUN pip install --require-hashes --only-binary=:all: -r requirements-russian-piper.lock
+COPY igw_google_voice/russian-speech-models.json ./igw_google_voice/russian-speech-models.json
+COPY igw_google_voice/russian_voices.py ./igw_google_voice/russian_voices.py
+COPY scripts/download-russian-speech.py ./scripts/download-russian-speech.py
+RUN python scripts/download-russian-speech.py --backend piper --output /models && \
+    python scripts/download-russian-speech.py --backend piper --voice piper-ru-irina --output /models && \
+    useradd --uid 10001 --no-create-home speech
+COPY igw_google_voice ./igw_google_voice
+USER 10001:10001
+CMD ["python", "-m", "igw_google_voice.russian_speech"]

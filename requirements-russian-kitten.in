@@ -1,0 +1,7 @@
+# Isolated KittenTTS 2 CPU pilot. Do not install into the Nano environment.
+kittenml==0.9.4
+torch==2.14.1
+torchaudio==2.11.0
+numpy==2.4.6
+scipy==1.17.1
+wyoming==1.10.2
