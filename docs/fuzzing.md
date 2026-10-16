@@ -1,5 +1,9 @@
 # Release-candidate fuzz testing
 
+See the [illustrated RC fuzzing process and verified rollout results](https://github.com/victron-venus/venus-os-ci-toolkit/blob/main/docs/rc-fuzzing-results.md)
+for the shared release flow, evidence requirements and a dated cross-project
+snapshot. The project-specific scope and reproduction guidance below still apply.
+
 ## Scope and assertions
 
 **urls.** The real IGW URL validator receives synthetic URL strings and verifies transport, path and credential/query exclusion. The explicit private-HTTP option is checked independently. No URL is fetched and no DNS lookup is made.
