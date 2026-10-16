@@ -19,9 +19,9 @@ from wyoming.tts import SynthesizeStopped
 
 from .kitten_client import MAX_AUDIO
 from .russian_text import MAX_TEXT, normalize_russian
-from .russian_voices import VOICES
+from .russian_voices import VOICES, SILERO_VOICES, SILERO_DEFAULT
 
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 STREAM_TIMEOUT = 120
 SENTENCE_END = re.compile(r'(?<=[.!?…])\s+')
 
@@ -61,9 +61,13 @@ def service_info(config):
     return Info(tts=[TtsProgram(name='Local Russian Speech', description='Private Russian speech; no cloud inference',
                                attribution=attribution, installed=True, version=VERSION,
                                supports_synthesize_streaming=True,
-                               voices=[TtsVoice(name=config.voice, description='Russian local voice',
+                               voices=[TtsVoice(name=name, description=('Follow service settings' if name == SILERO_DEFAULT else 'Russian local voice'),
                                                 attribution=attribution, installed=True, version=VERSION,
-                                                languages=['ru', 'ru-RU'])])])
+                                                languages=['ru', 'ru-RU']) for name in available_voices(config)])])
+
+
+def available_voices(config):
+    return (SILERO_DEFAULT, *SILERO_VOICES) if config.voice in SILERO_VOICES else (config.voice,)
 
 
 async def read_event(reader):
@@ -95,19 +99,41 @@ class HTTPSProvider:
     def __init__(self, config):
         self.config = config
 
-    async def synthesize(self, text):
+    async def prepare(self, voice):
+        if self.config.voice not in SILERO_VOICES:
+            return None
+        process = await asyncio.create_subprocess_exec(
+            sys.executable, '-m', 'igw_google_voice.kitten_client', '-',
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            request = dict(operation='settings', endpoint=self.config.endpoint,
+                           token=self.config.token, ca_file=self.config.ca_file)
+            async with asyncio.timeout(5):
+                output, _ = await process.communicate(json.dumps(request).encode())
+            if process.returncode or len(output) > 4096:
+                raise RuntimeError('Speech settings unavailable')
+            options = json.loads(output)
+            if voice and voice != SILERO_DEFAULT:
+                options['voice'] = voice
+            return options
+        finally:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+
+    async def synthesize(self, text, options=None):
         # A canceled caller can leave the HTTP model finishing its bounded work.
         # Retry only explicit busy responses, within this original total budget.
         delay = .1
         async with asyncio.timeout(self.config.timeout):
             while True:
-                result = await self._attempt(text)
+                result = await self._attempt(text, options)
                 if result is not None:
                     return result
                 await asyncio.sleep(delay)
                 delay = min(.8, delay * 2)
 
-    async def _attempt(self, text):
+    async def _attempt(self, text, options=None):
         # A separate process makes cancellation bound the entire HTTPS operation,
         # including DNS, TLS and a server that dribbles bytes indefinitely.
         process = await asyncio.create_subprocess_exec(
@@ -115,6 +141,8 @@ class HTTPSProvider:
             stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
         request = dict(endpoint=self.config.endpoint, token=self.config.token, text=text,
                        ca_file=self.config.ca_file, read_timeout=self.config.timeout + 1)
+        if options is not None:
+            request['options'] = options
         try:
             output, _ = await process.communicate(json.dumps(request).encode())
             if process.returncode == 75:
@@ -144,13 +172,14 @@ class SpeechService:
 
     def validate_voice(self, event):
         voice = event.data.get('voice') or {}
-        if (not isinstance(voice, dict) or voice.get('name') not in (None, '', self.config.voice)
+        if (not isinstance(voice, dict) or voice.get('name') not in (None, '', *available_voices(self.config))
                 or voice.get('language') not in (None, '', 'ru', 'ru-RU')
                 or voice.get('speaker') is not None
                 or event.data.get('text_format') not in (None, '', 'text')):
             raise ValueError('Invalid voice')
+        return voice.get('name')
 
-    async def stream(self, reader, writer):
+    async def stream(self, reader, writer, voice=None):
         """Synthesize complete sentences while HA continues sending text.
 
         One bounded reader owns the socket, including disconnect detection after
@@ -182,7 +211,9 @@ class SpeechService:
                         if sentence.strip():
                             sentences.put_nowait(normalize_russian(sentence))
                 elif event.type == 'synthesize' and not compatibility_seen:
-                    self.validate_voice(event)
+                    compatibility_voice = self.validate_voice(event)
+                    if compatibility_voice and compatibility_voice != voice:
+                        raise ValueError('Stream compatibility voice differs')
                     if event.data.get('text') != text:
                         raise ValueError('Stream compatibility text differs')
                     compatibility_seen = True
@@ -201,10 +232,11 @@ class SpeechService:
         async def speak():
             started = False
             total_bytes = 0
+            options = await self.provider.prepare(voice)
             while (text := await sentences.get()) is not None:
                 async with asyncio.timeout(self.config.timeout):
                     async with self.serial:
-                        pcm = await self.provider.synthesize(text)
+                        pcm = await self.provider.synthesize(text, options)
                 total_bytes += len(pcm)
                 if not pcm or len(pcm) % 2 or total_bytes > 24000 * 2 * 115:
                     raise RuntimeError('Invalid audio')
@@ -233,15 +265,16 @@ class SpeechService:
             await asyncio.gather(receiving, speaking, return_exceptions=True)
             self.admitted -= 1
 
-    async def request(self, reader, text):
+    async def request(self, reader, text, voice=None):
         # At most one active synthesis and one waiting caller. A single deadline
         # covers queue wait and inference, and disconnect cancels either stage.
         if self.admitted >= 2:
             raise RuntimeError('busy')
         self.admitted += 1
         async def serial_synthesis():
+            options = await self.provider.prepare(voice)
             async with self.serial:
-                return await self.provider.synthesize(text)
+                return await self.provider.synthesize(text, options)
         operation = asyncio.create_task(serial_synthesis())
         disconnect = asyncio.create_task(reader.read(1))
         try:
@@ -270,14 +303,14 @@ class SpeechService:
                 if event.type == 'describe':
                     await asyncio.wait_for(async_write_event(service_info(self.config).event(), writer), 5)
                     continue
-                self.validate_voice(event)
+                voice = self.validate_voice(event)
                 if event.type == 'synthesize-start':
-                    await self.stream(reader, writer)
+                    await self.stream(reader, writer, voice)
                     continue
                 if event.type != 'synthesize':
                     raise ValueError('Expected synthesis request')
                 text = normalize_russian(event.data.get('text'))
-                pcm = await self.request(reader, text)
+                pcm = await self.request(reader, text, voice)
                 if not pcm or len(pcm) % 2 or len(pcm) > 24000 * 2 * 115:
                     raise RuntimeError('Invalid audio')
                 async with asyncio.timeout(10):

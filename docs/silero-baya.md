@@ -6,6 +6,7 @@ phrase in both voices before choosing; expressiveness is a listening preference,
 not a property established by model size. The upstream model supports Russian
 stress, homographs, questions, emphasis and exclamations. This service accepts
 plain text only; arbitrary SSML and emotion-control markup remain rejected.
+The service can build validated prosody markup itself from the settings below.
 
 The model and its license are pinned by size and SHA-256 in the asset manifest.
 They are checked before the PyTorch package loader executes any model code.
@@ -42,15 +43,65 @@ Use the existing private TLS/token resources described in
 [Russian speech](russian-speech.md). The renderer selects `silero` and
 `silero-ru-baya` in both containers. Apply only after the canary passes.
 Once ready, reload the corresponding Wyoming integration in Home Assistant,
-then select **silero-ru-baya** in each Assist pipeline that uses this TTS service.
+then select **silero-ru-default** in each Assist pipeline that should follow
+the live service settings. An explicit **silero-ru-baya** pins that speaker.
 Keep its Russian language, conversation agent and speech recognition settings.
 Check any direct TTS callers that explicitly name the previous voice. A shared
 service affects every client using it, including displays as well as Dots.
 
-The voice name must agree in inference, Wyoming discovery and the HA pipeline.
-A stale `piper-ru-irina` request is deliberately rejected. The output remains
+Wyoming advertises five installed speakers and the `silero-ru-default` alias.
+A stale `piper-ru-irina` request is deliberately rejected. Each utterance captures
+the current settings once; every streamed sentence uses that same snapshot. The output remains
 mono 24 kHz, 16-bit PCM. Sentence streaming, cancellation, bounded concurrency,
-text normalization and request deadlines use the existing adapter unchanged.
+text normalization and request deadlines remain bounded in the adapter.
+
+## Live settings and all available voices
+
+The service exposes authenticated `GET /v1/settings` and `PATCH /v1/settings`.
+`POST /v1/speech` accepts an optional `options` object using the same keys, for
+one request only. These settings are available on the Silero backend:
+
+- `voice`: `silero-ru-baya` (default), `silero-ru-kseniya`, `silero-ru-xenia`,
+  `silero-ru-aidar`, or `silero-ru-eugene`. All share the pinned `v5_6_ru.pt` file.
+- `rate`: integer 80–130 percent, default 100.
+- `pitch`: integer −10–+10 percent, default 0.
+- `sentence_pause_ms`: 0–1000 milliseconds in steps of 50, default 0. Adds a
+  pause after sentences and after the final segment; natural pauses remain.
+- `intonation`: `auto` (default), `statement`, `question`, or `exclamation`.
+  A forced intonation applies to every sentence and is not an emotion model.
+- `emphasis_words`: an empty string by default, or up to ten comma-separated
+  whole words (160 characters total). Exact case-insensitive matching; list
+  grammatical forms separately. Numbers have already been expanded to words.
+- `emphasis_intensity`: integer 1–3, default 3; affects only matched words.
+- `auto_stress` and `auto_yo`: booleans, both true by default. These also
+  control their corresponding homograph preprocessing options.
+
+For example, PATCH `{"rate":110,"pitch":0}`. To synthesize once with another
+speaker, POST `{"text":"Готова помочь.","options":{"voice":"silero-ru-xenia"}}`.
+The API rejects unknown keys and wrong types instead of passing arbitrary
+arguments into the model. Input text stays plain text; the service creates
+escaped SSML internally. Markdown asterisks cannot inject emphasis.
+
+Set `RUSSIAN_SPEECH_SETTINGS_FILE=/state/settings.json` and mount persistent
+storage writable by UID 10001 at `/state`. The renderer creates a 64 MiB PVC
+for Silero. Without this variable the service reports `persistent: false` and
+settings reset when the process restarts. A bad stored file prevents startup;
+a failed save returns 503 and does not change the active settings. Keep the
+file private because emphasis words can contain household names.
+
+Install the companion
+[HA controls](https://github.com/ha-homelab/ha-echomuse/blob/main/docs/speech-settings.md)
+and use `silero-ru-default` in Assist pipelines to follow the live voice selector.
+The controls include a reset button and English, Russian, German, Spanish and
+French labels. The integration clears HA's TTS cache on changes; direct API
+clients must manage their own cache. Settings affect every client of this
+service, not just one satellite. Explicit Wyoming voice names override only
+the `voice` setting. The remaining prosody settings still apply.
+
+Piper Denis and Irina remain available in the separate Piper image; the
+KittenTTS 2 Russian backend remains an optional pilot. They cannot be selected
+in this running Silero instance. See [Russian speech](russian-speech.md) for
+their asset, hardware and licensing requirements.
 
 ## Acceptance and rollback
 
@@ -59,7 +110,12 @@ one short audible announcement on the speaker authorized by the operator.
 For the documented household, audible tests are restricted to the Audiocenter
 Dot; do not test all satellites just because they share the service.
 
-For rollback, restore the saved Piper image, `RUSSIAN_TTS_BACKEND=piper` and
+Before rolling back to a pre-settings Silero image, restore explicit
+`silero-ru-baya` pipeline voices; older images do not know the default alias.
+Disable the HA settings integration when its API is unavailable. Preserve
+the settings PVC.
+
+For a Piper rollback, restore the saved Piper image, `RUSSIAN_TTS_BACKEND=piper` and
 `RUSSIAN_SPEECH_VOICE=piper-ru-irina` in both containers. Reload Wyoming and
 restore the saved pipeline voice names. Do not reset, re-pair or flash a Dot.
 

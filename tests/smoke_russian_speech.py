@@ -16,6 +16,8 @@ import os
 import time
 import wave
 from igw_google_voice.russian_speech import RussianSynthesizer
+from igw_google_voice.speech_api import RussianSpeechHandler
+from igw_google_voice.russian_voices import SILERO_VOICES
 
 
 def main():
@@ -34,6 +36,19 @@ def main():
                 assert audio.getnframes() > 24000
                 duration = audio.getnframes() / 24000
             print(f'Synthesis: {time.monotonic() - started:.3f}s, audio: {duration:.3f}s', flush=True)
+        if synth.backend == 'silero':
+            cases = [{'voice': name} for name in SILERO_VOICES]
+            cases += [dict(rate=110, pitch=2, sentence_pause_ms=250, emphasis_words='Батарея',
+                           emphasis_intensity=level, intonation=intonation)
+                      for level, intonation in ((1, 'statement'), (2, 'question'), (3, 'exclamation'))]
+            cases += [dict(rate=80, pitch=-10), dict(rate=130, pitch=10),
+                      dict(auto_stress=False, auto_yo=False)]
+            for options in cases:
+                audio = synth.generate('Батарея заряжена. Всё хорошо!', options)
+                with wave.open(io.BytesIO(audio), 'rb') as wav:
+                    assert wav.getnframes() > 2400
+                    assert any(wav.readframes(wav.getnframes()))
+                print('Settings inference passed: ' + repr(options), flush=True)
         with tempfile.TemporaryDirectory(prefix="speech-smoke-") as directory:
             root = Path(directory)
             key = rsa.generate_private_key(65537, 2048)
@@ -52,7 +67,8 @@ def main():
             private_key.chmod(0o600)
             token = "disposable-synthetic-token-for-smoke-only"
             server = SpeechServer(("127.0.0.1", 0), synth, token,
-                                  tls_context=server_context(certificate, private_key))
+                                  tls_context=server_context(certificate, private_key),
+                                  handler_class=RussianSpeechHandler)
             worker = threading.Thread(target=server.serve_forever, daemon=True)
             worker.start()
             try:

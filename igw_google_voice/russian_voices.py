@@ -5,7 +5,9 @@ PIPER_VOICES = {
     'piper-ru-denis': ('piper', 'ru/ru_RU/denis/medium/ru_RU-denis-medium.onnx'),
     'piper-ru-irina': ('piper-irina', 'ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx'),
 }
-SILERO_VOICES = {'silero-ru-baya': ('silero', 'v5_6_ru.pt', 'baya')}
+SILERO_VOICES = {f'silero-ru-{name}': ('silero', 'v5_6_ru.pt', name)
+                 for name in ('baya', 'kseniya', 'xenia', 'aidar', 'eugene')}
+SILERO_DEFAULT = 'silero-ru-default'
 VOICES = (*PIPER_VOICES, *SILERO_VOICES, 'kitten2-russian')
 
 

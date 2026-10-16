@@ -86,7 +86,7 @@ class AssetTests(unittest.TestCase):
             result = subprocess.run([sys.executable, 'scripts/render-russian-speech.py',
                 '--node', 'test-node', '--image', 'registry.example/speech@sha256:' + 'a' * 64,
                 '--voice', voice], check=True, capture_output=True, text=True)
-            containers = json.loads(result.stdout)['items'][0]['spec']['template']['spec']['containers']
+            containers = next(i for i in json.loads(result.stdout)['items'] if i['kind'] == 'Deployment')['spec']['template']['spec']['containers']
             self.assertEqual(len(containers), 2)
             for container in containers:
                 env = {item['name']: item['value'] for item in container['env']}
@@ -136,7 +136,9 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         self.calls = []
         outer = self
         class Provider:
-            async def synthesize(self, text):
+            async def prepare(self, voice):
+                return None
+            async def synthesize(self, text, options=None):
                 outer.calls.append(text)
                 return b'\x01\x00' * 4800
         self.service = SpeechService(self.config, Provider())
@@ -202,7 +204,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
         reader, writer = await self.connect()
         await async_write_event(Event(type='describe'), writer)
         info = await asyncio.wait_for(async_read_event(reader), 2)
-        self.assertEqual([v['name'] for v in info.data['tts'][0]['voices']], ['silero-ru-baya'])
+        self.assertEqual([v['name'] for v in info.data['tts'][0]['voices']], ['silero-ru-default', 'silero-ru-baya', 'silero-ru-kseniya', 'silero-ru-xenia', 'silero-ru-aidar', 'silero-ru-eugene'])
         self.assertTrue(info.data['tts'][0]['supports_synthesize_streaming'])
         await async_write_event(Event(type='synthesize', data={'text': 'Батарея 63%.',
             'voice': {'name': 'silero-ru-baya', 'language': 'ru'}}), writer)
@@ -262,7 +264,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_stream_disconnect_cancels_inference_after_input_stop(self):
         began, cancelled = asyncio.Event(), asyncio.Event()
-        async def blocked(text):
+        async def blocked(text, options=None):
             began.set()
             try:
                 await asyncio.Event().wait()
@@ -294,7 +296,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
     async def test_disconnect_cancels_request_and_releases_lease(self):
         began = asyncio.Event()
         cancelled = asyncio.Event()
-        async def blocked(text):
+        async def blocked(text, options=None):
             began.set()
             try:
                 await asyncio.Event().wait()
@@ -316,7 +318,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
     async def test_pair_queues_in_order_and_third_request_is_rejected(self):
         release = asyncio.Event()
         active = []
-        async def blocked(text):
+        async def blocked(text, options=None):
             active.append(text)
             await release.wait()
             return b'\x01\x00' * 4800
@@ -342,7 +344,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
     async def test_queued_disconnect_never_enters_provider(self):
         release = asyncio.Event()
         active = []
-        async def blocked(text):
+        async def blocked(text, options=None):
             active.append(text)
             await release.wait()
             return b'\x01\x00' * 4800
@@ -369,7 +371,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_deadline_bounds_wait_and_active_inference(self):
         cancelled = asyncio.Event()
-        async def blocked(text):
+        async def blocked(text, options=None):
             try:
                 await asyncio.Event().wait()
             finally:
@@ -384,7 +386,7 @@ class WyomingTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_queue_time_counts_toward_the_same_deadline(self):
         began = asyncio.Event()
-        async def slow(text):
+        async def slow(text, options=None):
             began.set()
             await asyncio.sleep(.7)
             return b'\x01\x00' * 4800

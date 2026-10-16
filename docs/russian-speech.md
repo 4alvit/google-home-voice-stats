@@ -15,7 +15,8 @@ listen to the actual output first.
 
 **Silero Baya** (`silero-ru-baya`) is an additional female Russian voice, using
 the pinned `v5_6_ru` model. It runs on CPU in a separate image and uses the same
-bounded HTTPS and Wyoming interfaces. See [Baya setup and rollback](silero-baya.md).
+bounded HTTPS and Wyoming interfaces. The same pinned model also supplies
+Kseniya, Xenia, Aidar and Eugene. See [Baya setup, live settings and rollback](silero-baya.md).
 
 ## Request path and limits
 

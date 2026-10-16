@@ -14,6 +14,8 @@ import wave
 from .kitten_service import SpeechServer, Synthesizer, server_tls_context
 from .russian_text import normalize_russian
 from .russian_voices import BACKENDS, PIPER_VOICES, SILERO_VOICES, asset_bundles, select_voice
+from .speech_settings import SettingsStore, silero_arguments
+from .speech_api import RussianSpeechHandler
 
 RATE = 24000
 
@@ -104,13 +106,14 @@ class RussianModel:
                                     session=ort.InferenceSession(str(path), sess_options=options,
                                                                 providers=['CPUExecutionProvider']))
 
-    def generate(self, text):
+    def generate(self, text, options=None):
         import numpy as np
         text = normalize_russian(text)
         if self.backend == 'silero':
             import torch
             with torch.inference_mode():
-                samples = self.model.apply_tts(text=text, speaker=self.speaker, sample_rate=RATE)
+                settings = {'voice': self.voice, **(options or {})}
+                samples = self.model.apply_tts(**silero_arguments(text, settings))
             return to_wav(samples.detach().cpu().numpy(), RATE)
         if self.backend == 'kitten2':
             samples = self.model.generate(text, voice='Russian', normalize=False,
@@ -140,9 +143,12 @@ def russian_worker(connection, root, threads, backend, voice):
         model.generate('Готово.')
         connection.send(True)
         while True:
-            text = connection.recv()
+            request = connection.recv()
             try:
-                connection.send_bytes(model.generate(text))
+                if isinstance(request, dict):
+                    connection.send_bytes(model.generate(request['text'], request['options']))
+                else:
+                    connection.send_bytes(model.generate(request))
             except Exception:
                 connection.send_bytes(b'')
     except (EOFError, BrokenPipeError):
@@ -158,11 +164,12 @@ def russian_worker(connection, root, threads, backend, voice):
 
 
 class RussianSynthesizer(Synthesizer):
-    def __init__(self, model_dir, backend='piper', timeout=30, threads=4, voice=None):
+    def __init__(self, model_dir, backend='piper', timeout=30, threads=4, voice=None, settings_file=None):
         if backend not in BACKENDS or not 1 <= timeout <= 120:
             raise ValueError('Invalid Russian speech configuration')
         self.backend = backend
         self.voice = select_voice(backend, voice)
+        self.settings = SettingsStore(settings_file, self.voice) if backend == 'silero' else None
         super().__init__(model_dir, timeout=timeout, threads=threads)
 
     def _start(self):
@@ -179,9 +186,13 @@ class RussianSynthesizer(Synthesizer):
             raise RuntimeError('Russian speech worker failed to start')
         self.ready.set()
 
-    def generate(self, text):
+    def generate(self, text, options=None):
         # Validate before IPC: malformed text must not trigger an expensive reload.
         normalized = normalize_russian(text)
+        if self.settings is not None:
+            return super().generate({'text': normalized, 'options': self.settings.snapshot(options)})
+        if options:
+            raise ValueError('Settings require the Silero backend')
         return super().generate(normalized)
 
 
@@ -194,12 +205,14 @@ def main():
     synth = RussianSynthesizer(os.environ['RUSSIAN_MODEL_ROOT'],
                                backend=os.environ.get('RUSSIAN_TTS_BACKEND', 'piper'),
                                voice=os.environ.get('RUSSIAN_SPEECH_VOICE'),
+                               settings_file=os.environ.get('RUSSIAN_SPEECH_SETTINGS_FILE'),
                                timeout=float(os.environ.get('RUSSIAN_TTS_TIMEOUT', '30')),
                                threads=int(os.environ.get('KITTEN_THREADS', '4')))
     server = None
     try:
         server = SpeechServer((os.environ.get('KITTEN_BIND_HOST', '127.0.0.1'),
-                               int(os.environ.get('KITTEN_PORT', '8093'))), synth, token, tls_context=context)
+                               int(os.environ.get('KITTEN_PORT', '8093'))), synth, token, tls_context=context,
+                              handler_class=RussianSpeechHandler)
         server.serve_forever()
     finally:
         if server is not None:
