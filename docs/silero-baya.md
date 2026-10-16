@@ -143,3 +143,16 @@ Keep the bundled license and attribution with redistributed model artifacts;
 do not treat the weights as covered by this repository's code license. The
 model's noncommercial restriction applies independently of where inference runs.
 Weights, speech samples, tokens and deployment receipts are not committed here.
+
+## Settings rollout — October 16, 2026
+
+The pinned model generated valid audio for all five installed voices. On the
+NUC, the final image passed two concurrent Wyoming requests in 3.50 and 5.80
+seconds (6.90 seconds of output each). Its streaming probe delivered first audio
+in 2.32 seconds, before input ended. The inference container retained its two-CPU,
+1 GiB limit; the adapter retained its 250m CPU and 128 MiB limits.
+
+The probe exercised speech-rate and pitch boundaries, all three emphasis levels,
+forced sentence types, pauses, and disabled pronunciation aids. Settings were
+saved on a persistent volume. These are generated-audio and protocol checks,
+not a listening preference test or an end-to-end microphone latency measurement.
