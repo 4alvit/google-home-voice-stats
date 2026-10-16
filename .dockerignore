@@ -19,3 +19,5 @@
 !scripts/download-nano.py
 !scripts/download-russian-speech.py
 !requirements-russian-piper.lock
+
+!requirements-tls.lock

@@ -8,11 +8,12 @@ import logging
 import multiprocessing as mp
 import os
 import signal
-import ssl
 import sys
 from pathlib import Path
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from .tls_policy import server_context
 import wave
 
 LOG = logging.getLogger("igw_kitten")
@@ -234,10 +235,7 @@ class SpeechHandler(BaseHTTPRequestHandler):
 
 
 def server_tls_context(cert_file, key_file):
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.load_cert_chain(certfile=cert_file, keyfile=key_file)
-    return context
+    return server_context(cert_file, key_file)
 
 
 def main():

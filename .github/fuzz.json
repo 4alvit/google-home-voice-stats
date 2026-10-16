@@ -51,6 +51,8 @@
     "requirements-kitten-package.lock",
     "requirements-kitten.lock",
     "requirements-piper.lock",
-    "requirements-test.lock"
+    "requirements-test.lock",
+    "requirements-tls.in",
+    "requirements-tls.lock"
   ]
 }

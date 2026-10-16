@@ -3,11 +3,14 @@ FROM ${PYTHON_IMAGE}
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 \
     HF_HUB_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 WORKDIR /app
+COPY requirements-tls.lock ./
+RUN pip install --require-hashes --only-binary=:all: -r requirements-tls.lock
 COPY requirements-kitten.lock requirements-kitten-package.lock ./
 RUN pip install --require-hashes --only-binary=:all: -r requirements-kitten.lock && \
     pip install --no-deps --require-hashes --only-binary=:all: -r requirements-kitten-package.lock
-COPY scripts/download-nano.py /tmp/download-nano.py
-RUN python /tmp/download-nano.py && rm /tmp/download-nano.py
+COPY igw_google_voice/tls_policy.py igw_google_voice/_darwin_certificate.py ./igw_google_voice/
+COPY scripts/download-nano.py ./scripts/download-nano.py
+RUN python scripts/download-nano.py
 COPY igw_google_voice ./igw_google_voice
 RUN useradd --uid 10001 --no-create-home speech
 USER 10001:10001

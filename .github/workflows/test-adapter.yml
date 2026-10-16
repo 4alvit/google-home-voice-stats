@@ -24,7 +24,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg espeak-ng fonts-dejavu-core
-          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-build.txt -r requirements-test.lock
+          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-build.txt -r requirements-test.lock -r requirements-tls.lock
           python3 -m pip install --no-deps --no-build-isolation '.[test,cast]'
       - name: Test response handling and rendered HA configuration
         run: bash scripts/ci.sh unit

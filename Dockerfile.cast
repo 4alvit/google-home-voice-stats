@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg espeak-ng fonts-dejavu-core ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+COPY requirements-tls.lock ./
+RUN pip install --require-hashes --only-binary=:all: -r requirements-tls.lock
 COPY requirements-cast.lock requirements-piper.lock ./
 COPY .github/requirements-build.txt ./requirements-build.txt
 RUN pip install --require-hashes --only-binary=:all: -r requirements-build.txt && \

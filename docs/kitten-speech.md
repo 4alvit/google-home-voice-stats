@@ -173,11 +173,11 @@ mkdir -p "$SPEECH_ROOT/app"
 chmod 700 "$SPEECH_ROOT"
 python3.11 -m venv "$SPEECH_ROOT"
 "$SPEECH_ROOT/bin/python" -m pip install --require-hashes --only-binary=:all: \
-  -r requirements-kitten-macos-intel.lock
+  -r requirements-kitten-macos-intel.lock -r requirements-tls.lock
 "$SPEECH_ROOT/bin/python" -m pip install --no-deps --require-hashes --only-binary=:all: \
   -r requirements-kitten-package.lock
 cp -R igw_google_voice "$SPEECH_ROOT/app/"
-python3 scripts/download-nano.py --variant fp32 --output "$SPEECH_ROOT/models/nano-fp32"
+"$SPEECH_ROOT/bin/python" scripts/download-nano.py --variant fp32 --output "$SPEECH_ROOT/models/nano-fp32"
 install -m 600 speech-token "$SPEECH_ROOT/speech-token"
 mkdir -p "$SPEECH_ROOT/tls"
 chmod 700 "$SPEECH_ROOT/tls"

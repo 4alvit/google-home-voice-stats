@@ -10,7 +10,9 @@ import ssl
 import errno
 import time
 from urllib.error import HTTPError, URLError
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
+
+from .tls_policy import https_context
 
 BASE_REPORT_KEYS = ("battery", "solar", "solar_today", "status", "alarms")
 REPORT_KEYS = (*BASE_REPORT_KEYS, "flow")
@@ -131,7 +133,7 @@ def fetch_snapshot(config, *, opener=None, now=time.time, clock=time.monotonic,
         headers["CF-Access-Client-Id"] = config.cf_client_id
         headers["CF-Access-Client-Secret"] = config.cf_client_secret
     request = Request(config.igw_url, headers=headers)
-    transport = opener or build_opener(ProxyHandler({}), NoRedirects())
+    transport = opener or build_opener(ProxyHandler({}), NoRedirects(), HTTPSHandler(context=https_context()))
     deadline = clock() + deadline_seconds
     for attempt in range(2):
         remaining = deadline - clock()

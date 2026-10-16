@@ -13,3 +13,5 @@ Security fixes target the current default branch and the latest maintained relea
 Keep IGW credentials in private configuration and use a dedicated read token. HTTPS with certificate verification is the normal gateway transport. The explicit private-network HTTP mode exposes that token to the trusted network and is unsuitable for public traffic. Restrict the Cast service and generated media endpoints to the intended network; possession of a playback token grants access to its report. Do not expose energy reports or household metadata in logs or public issue attachments.
 
 Use synthetic data for testing. Never attach live tokens, private keys, database exports or household telemetry to public CI artifacts. Report a suspected credential exposure privately and revoke the credential through its issuer. See [CONTRIBUTING.md](CONTRIBUTING.md) for validation and [the evidence index](docs/openssf-evidence.md) for assessment limits.
+
+Credit the reporter in coordinated advisories and release notes unless they request anonymity. Keep private identities and unpatched exploit details confidential while a fix is prepared.

@@ -426,3 +426,7 @@ The real IGW URL validator receives synthetic URL strings and verifies transport
 
 Source release artifacts, installation checks and acceptance limits are documented in
 [release packaging](docs/release-packaging.md) and [the release strategy](RELEASING.md).
+
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15582/badge)](https://www.bestpractices.dev/projects/15582)
+
+See the [standalone speech TLS profile](docs/tls-policy.md), [quality evidence](docs/quality.md), [governance](GOVERNANCE.md), [Code of Conduct](CODE_OF_CONDUCT.md) and [roadmap](ROADMAP.md).
