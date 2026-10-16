@@ -8,7 +8,9 @@ import logging
 import os
 from pathlib import Path
 import re
+import ssl
 import sys
+from urllib.parse import urlsplit
 import wave
 
 from wyoming.audio import AudioStart, AudioChunk, AudioStop
@@ -20,6 +22,8 @@ from wyoming.tts import SynthesizeStopped
 from .kitten_client import MAX_AUDIO
 from .russian_text import MAX_TEXT, normalize_russian
 from .russian_voices import VOICES, SILERO_VOICES, SILERO_DEFAULT
+from .speech_settings import DEFAULTS, validate_patch
+from .tls_policy import enforce_peer_key_policy
 
 VERSION = '0.3.0'
 STREAM_TIMEOUT = 120
@@ -98,28 +102,66 @@ async def read_event(reader):
 class HTTPSProvider:
     def __init__(self, config):
         self.config = config
+        self.settings_tls = None
+
+    def _settings_context(self):
+        context = ssl.create_default_context(cafile=self.config.ca_file)
+        context.hostname_checks_common_name = False
+        return enforce_peer_key_policy(context)
 
     async def prepare(self, voice):
         if self.config.voice not in SILERO_VOICES:
             return None
-        process = await asyncio.create_subprocess_exec(
-            sys.executable, '-m', 'igw_google_voice.kitten_client', '-',
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        # Tiny, bounded settings responses do not need an inference subprocess.
+        # Forking two TLS clients exhausted the 250m CPU budget on small hosts.
+        # The same owned TLS/key policy applies; cancellation closes the socket.
+        writer = None
         try:
-            request = dict(operation='settings', endpoint=self.config.endpoint,
-                           token=self.config.token, ca_file=self.config.ca_file)
             async with asyncio.timeout(5):
-                output, _ = await process.communicate(json.dumps(request).encode())
-            if process.returncode or len(output) > 4096:
+                if self.settings_tls is None:
+                    self.settings_tls = await asyncio.to_thread(self._settings_context)
+                url = urlsplit(self.config.endpoint)
+                reader, writer = await asyncio.open_connection(
+                    url.hostname, url.port or 443, ssl=self.settings_tls,
+                    server_hostname=url.hostname, ssl_handshake_timeout=3, limit=16384)
+                request = (f'GET /v1/settings HTTP/1.1\r\nHost: {url.netloc}\r\n'
+                           f'Authorization: Bearer {self.config.token}\r\nConnection: close\r\n\r\n')
+                writer.write(request.encode('ascii'))
+                await writer.drain()
+                response = bytearray()
+                while chunk := await reader.read(4096):
+                    response.extend(chunk)
+                    if len(response) > 20480:
+                        raise RuntimeError('Oversized settings response')
+            headers, separator, output = bytes(response).partition(b'\r\n\r\n')
+            lines = headers.split(b'\r\n')
+            status = lines.pop(0).split()
+            if (not separator or len(headers) > 4096 or len(status) < 2
+                    or status[0] not in (b'HTTP/1.0', b'HTTP/1.1') or status[1] != b'200'):
                 raise RuntimeError('Speech settings unavailable')
-            options = json.loads(output)
+            fields = {}
+            for line in lines:
+                key, sep, value = line.partition(b':')
+                key = key.strip().lower()
+                if not sep or key in fields:
+                    raise RuntimeError('Invalid settings headers')
+                fields[key] = value.strip()
+            if (fields.get(b'content-length') != str(len(output)).encode()
+                    or fields.get(b'content-type') != b'application/json'
+                    or b'transfer-encoding' in fields or b'content-encoding' in fields
+                    or len(output) > 16384):
+                raise RuntimeError('Invalid settings response')
+            options = validate_patch(json.loads(output)['settings'])
+            if options.keys() != DEFAULTS.keys():
+                raise RuntimeError('Incomplete settings response')
             if voice and voice != SILERO_DEFAULT:
                 options['voice'] = voice
             return options
         finally:
-            if process.returncode is None:
-                process.kill()
-            await process.wait()
+            if writer is not None:
+                writer.close()
+                with contextlib.suppress(OSError, TimeoutError):
+                    await asyncio.wait_for(writer.wait_closed(), 1)
 
     async def synthesize(self, text, options=None):
         # A canceled caller can leave the HTTP model finishing its bounded work.

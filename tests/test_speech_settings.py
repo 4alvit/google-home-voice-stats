@@ -132,6 +132,12 @@ class SettingsAPITests(unittest.TestCase):
         self.assertEqual((first['voice'], first['rate']), ('silero-ru-kseniya', 111))
         self.assertEqual((second['voice'], second['rate']), ('silero-ru-eugene', 100))
         self.assertEqual(fetch_settings(self.endpoint, self.server.token, self.ca)['rate'], 100)
+        async def pair():
+            return await asyncio.gather(provider.prepare('silero-ru-aidar'),
+                                        provider.prepare('silero-ru-xenia'))
+        voices = asyncio.run(pair())
+        self.assertEqual([v['voice'] for v in voices], ['silero-ru-aidar', 'silero-ru-xenia'])
+        self.assertEqual(self.settings.snapshot()['voice'], 'silero-ru-kseniya')
 
 
 if __name__ == '__main__':
