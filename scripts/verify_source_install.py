@@ -76,6 +76,8 @@ for name in ('script/igw/announce_energy.yaml', 'automation/igw/battery_reserve.
                 "--only-binary=:all:",
                 "-r",
                 str(root / ".github/requirements-build.txt"),
+                "-r",
+                str(root / "requirements-tls.lock"),
             ],
             check=True,
         )

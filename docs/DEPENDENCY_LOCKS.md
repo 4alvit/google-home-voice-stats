@@ -15,8 +15,11 @@ not establish that a package is free of vulnerabilities. Keep dependency
 security scanning and update review enabled.
 
 The test, Cast runtime and optional Piper runtime each have a separate lock.
+All Python runtime environments additionally install `requirements-tls.lock`,
+which pins the certificate-key decoder and its dependencies. Intel macOS uses
+the native public-key decoder documented in `tls-policy.md`.
 Their top-level versions come from `pyproject.toml`. The image uses a pinned
-Python 3.12 Bookworm manifest; review a live registry manifest before changing
+Python Bookworm manifest; review a live registry manifest before changing
 that digest. CI tests both `CAST_INSTALL_PIPER=false` and `true`, checks installed
 dependency consistency and imports the runtime without contacting Cast devices.
 The Python locks do not freeze Debian apt repositories; OS packages still

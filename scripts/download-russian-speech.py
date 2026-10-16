@@ -5,10 +5,10 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 from pathlib import Path
-import urllib.request
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from igw_google_voice.tls_policy import open_download
 from igw_google_voice.russian_voices import BACKENDS, VOICES, asset_bundles
 
 
@@ -29,7 +29,7 @@ def download(root, bundle, specification, item):
     url = ('https://huggingface.co/' + specification['repository'] + '/resolve/'
            + specification['revision'] + '/' + item['path'])
     try:
-        with urllib.request.urlopen(url, timeout=60) as source, temporary.open('wb') as output:
+        with open_download(url, timeout=60) as source, temporary.open('wb') as output:
             total = 0
             while block := source.read(1024 * 1024):
                 total += len(block)

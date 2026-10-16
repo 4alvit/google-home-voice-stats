@@ -2,7 +2,11 @@
 import argparse
 import hashlib
 from pathlib import Path
-import urllib.request
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from igw_google_voice.tls_policy import open_download
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--variant', choices=['int8', 'fp32'], default='int8')
@@ -17,7 +21,7 @@ root = args.output
 root.mkdir(parents=True, exist_ok=True)
 for name, checksum in FILES.items():
     url = f"https://huggingface.co/KittenML/kitten-tts-nano-0.8-{args.variant}/resolve/{REVISION}/{name}"
-    with urllib.request.urlopen(url, timeout=90) as response:
+    with open_download(url, timeout=90) as response:
         data = response.read(64_000_000)
     if hashlib.sha256(data).hexdigest() != checksum:
         raise RuntimeError("Nano model checksum mismatch")

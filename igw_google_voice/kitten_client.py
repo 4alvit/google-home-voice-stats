@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 import wave
 
 from .__main__ import local_http_host
+from .tls_policy import enforce_peer_key_policy
 
 MAX_AUDIO = 6_000_000
 
@@ -31,6 +32,7 @@ def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
     context.minimum_version = ssl.TLSVersion.TLSv1_2
     context.hostname_checks_common_name = False
     context.load_verify_locations(cafile=ca_file)
+    enforce_peer_key_policy(context)
     connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443,
                                              timeout=2, context=context)
     try:

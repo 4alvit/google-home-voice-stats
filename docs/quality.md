@@ -1,0 +1,11 @@
+# Quality evidence and limitations
+
+This project includes the Python adapter and speech service, generated Home Assistant configuration, shell/Python release tooling and pinned model/runtime dependencies. The main source license is MIT. Reused components and model weights retain their own licenses and notices; the model manifest pins their origin, revisions, size and hash. No claim that all optional dependencies share MIT is made.
+
+The October 16 local application suite ran 123 tests (122 passed and one external-media-tool test skipped), and the new TLS suite passed 60 real client/chain/protocol combinations plus server-key and redirect checks. CI additionally builds locked images, validates generated HA configuration and tests actual offline model inference. The updated Piper smoke passed locally for both Denis and Irina through authenticated HTTPS to full WAV output, with external networking disabled. Current results must be tied to their source revision; they do not establish physical playback or all-branch coverage.
+
+Bandit and practical Ruff error rules cover owned application code; CodeQL analyzes Python and Actions across the repository. Hash-locked dependencies and scheduled security scans complement these checks. Ordinary unit tests are not fuzzing. Earlier RC fuzz evidence in docs/fuzzing.md remains historical and source-bound; this change does not invent a new fuzz campaign or penetration test.
+
+On October 16 the authenticated GitHub inventory had no public bug/feature issues, project vulnerability advisories, open dependency alerts or secret alerts. The maintainer confirmed secure-design/common-vulnerability knowledge and no outside bug, feature or vulnerability reports during the preceding 12 months. Binary Go release helpers require an additional audit, recorded in RELEASE_TLS_PROFILE.md; an empty GitHub dependency inventory does not prove those binaries free from advisories.
+
+Strict warning completeness, full statement/branch coverage, independent reproducible builds, complete accessibility and an assurance case for every optional integration remain unestablished. There is no backup maintainer or tested one-week recovery process. These Silver limitations stay explicit.

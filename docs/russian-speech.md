@@ -238,7 +238,7 @@ is not the total download or resident memory requirement.
 ```sh
 python3.11 -m venv /PRIVATE/PATH/tts2-venv
 /PRIVATE/PATH/tts2-venv/bin/pip install --require-hashes \
-  -r requirements-russian-kitten.lock
+  -r requirements-russian-kitten.lock -r requirements-tls.lock
 python3 scripts/download-russian-speech.py --backend kitten2 \
   --output /PRIVATE/PATH/models
 /PRIVATE/PATH/tts2-venv/bin/python scripts/benchmark-russian-speech.py \
