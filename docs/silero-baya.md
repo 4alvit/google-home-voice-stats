@@ -63,6 +63,22 @@ For rollback, restore the saved Piper image, `RUSSIAN_TTS_BACKEND=piper` and
 `RUSSIAN_SPEECH_VOICE=piper-ru-irina` in both containers. Reload Wyoming and
 restore the saved pipeline voice names. Do not reset, re-pair or flash a Dot.
 
+## Verified deployment example (2026-10-16)
+
+On an Intel Core i5-5300U NUC, with the inference container limited to two
+CPUs and 1 GiB RAM, two simultaneous synthetic requests completed in 3.19
+and 5.51 seconds. Each produced 6.90 seconds of mono 24 kHz audio. A streamed
+request delivered its first audio in 2.17 seconds, before the client sent
+`synthesize-stop`. The container used approximately 731 MiB at the end of
+the probe. These are individual acceptance measurements, not latency guarantees.
+
+The tested image also completed synthetic inference with networking disabled,
+a read-only root filesystem, a 64 MiB temporary directory, and no capabilities.
+The build host could not enforce CPU quotas; the NUC canary enforced the actual
+production CPU and memory limits. On a heavily reserved node, the temporary
+canary used smaller scheduling requests while retaining the same hard limits;
+production reservations were unchanged. No ambient audio was recorded.
+
 ## Attribution
 
 The [Silero project](https://github.com/snakers4/silero-models) publishes the
