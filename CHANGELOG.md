@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.3] - 2026-10-17
+
+### Changed
+
+- Apply verified certificate-chain key checks to the speech HTTPS path.
+- Document OpenSSF assessment evidence and the illustrated RC fuzzing process and results.
+
+### Upgrade
+
+Preserve installation-specific credentials and configuration. Ensure speech HTTPS peers satisfy the documented TLS trust and key requirements, and retain the previous package for rollback. Physical speaker and cloud-integration acceptance remains deployment-specific.
+
+### Security
+
+Speech HTTPS connections now enforce the documented verified-chain key policy before using the transport. Required CI and source-bound RC fuzzing remain enabled.
+
 ## [0.3.2] - 2026-10-14
 
 ### Changed
