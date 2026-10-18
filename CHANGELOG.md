@@ -6,15 +6,13 @@
 
 - Add configurable local Silero Russian speech, bounded voice and prosody settings, and persistent settings controls. Keep the container on a Python version supported by its pinned ONNX runtime.
 
-### Upgrade and validation
-
-Preserve installation-specific configuration and retain the previous immutable release for rollback. Required CI and source-bound RC qualification remain enabled. Publishing this release does not deploy it to an installation or establish hardware acceptance.
-
-## Unreleased
-
 - Add persistent Silero voice/prosody settings over authenticated HTTPS and a
   Wyoming service-default alias. Expose all five pinned v5_6_ru speakers while
   preserving per-utterance streaming snapshots and bounded synthesis.
+
+### Upgrade and validation
+
+Preserve installation-specific configuration and retain the previous immutable release for rollback. Required CI and source-bound RC qualification remain enabled. Publishing this release does not deploy it to an installation or establish hardware acceptance.
 
 ## [0.3.3] - 2026-10-17
 
