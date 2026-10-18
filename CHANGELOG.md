@@ -10,9 +10,13 @@
   Wyoming service-default alias. Expose all five pinned v5_6_ru speakers while
   preserving per-utterance streaming snapshots and bounded synthesis.
 
-### Upgrade and validation
+### Upgrade
 
 Preserve installation-specific configuration and retain the previous immutable release for rollback. Required CI and source-bound RC qualification remain enabled. Publishing this release does not deploy it to an installation or establish hardware acceptance.
+
+### Security
+
+The settings API retains authenticated HTTPS, certificate verification, bounded input and private persisted settings. Keep the settings bearer token outside source and public logs.
 
 ## [0.3.3] - 2026-10-17
 
