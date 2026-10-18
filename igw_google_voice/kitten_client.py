@@ -19,7 +19,7 @@ class SpeechBusy(ValueError):
 
 
 
-def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
+def fetch_audio(endpoint, token, text, ca_file, read_timeout=13, options=None):
     if not 1 <= read_timeout <= 121:
         raise ValueError("invalid speech read timeout")
     parsed = urlsplit(endpoint)
@@ -40,7 +40,10 @@ def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
         # The parent enforces its total budget, including connection setup.
         # Allow the server's twelve-second inference budget plus response overhead.
         connection.sock.settimeout(read_timeout)
-        connection.request("POST", parsed.path, json.dumps({"text": text}).encode(), {
+        body = {"text": text}
+        if options is not None:
+            body['options'] = options
+        connection.request("POST", parsed.path, json.dumps(body).encode(), {
             "Authorization": "Bearer " + token, "Content-Type": "application/json"})
         response = connection.getresponse()
         if response.status == 503:
@@ -63,11 +66,42 @@ def fetch_audio(endpoint, token, text, ca_file, read_timeout=13):
         connection.close()
 
 
+def fetch_settings(endpoint, token, ca_file):
+    """Read only the settings sibling of a validated private speech endpoint."""
+    parsed = urlsplit(endpoint)
+    if (parsed.scheme != 'https' or not parsed.hostname or not local_http_host(parsed.hostname)
+            or parsed.path != '/v1/speech' or parsed.username or parsed.password
+            or parsed.query or parsed.fragment):
+        raise ValueError('Invalid speech endpoint')
+    context = ssl.create_default_context(cafile=ca_file)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.hostname_checks_common_name = False
+    enforce_peer_key_policy(context)
+    connection = http.client.HTTPSConnection(parsed.hostname, parsed.port or 443, timeout=3, context=context)
+    try:
+        connection.request('GET', '/v1/settings', headers={'Authorization': 'Bearer ' + token})
+        response = connection.getresponse()
+        data = response.read(16385)
+        if response.status != 200 or len(data) > 16384:
+            raise ValueError('Settings request failed')
+        from .speech_settings import DEFAULTS, validate_patch
+        settings = validate_patch(json.loads(data)['settings'])
+        if settings.keys() != DEFAULTS.keys():
+            raise ValueError('Incomplete speech settings')
+        return settings
+    finally:
+        connection.close()
+
+
 def main():
     try:
         request = json.loads(sys.stdin.buffer.read(16384))
+        if request.get('operation') == 'settings':
+            settings = fetch_settings(request['endpoint'], request['token'], request['ca_file'])
+            sys.stdout.write(json.dumps(settings))
+            return
         data = fetch_audio(request["endpoint"], request["token"], request["text"], request["ca_file"],
-                           read_timeout=request.get("read_timeout", 13))
+                           read_timeout=request.get("read_timeout", 13), options=request.get('options'))
         if sys.argv[1] == "-":
             sys.stdout.buffer.write(data)
         else:

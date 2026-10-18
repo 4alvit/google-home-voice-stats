@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add persistent Silero voice/prosody settings over authenticated HTTPS and a
+  Wyoming service-default alias. Expose all five pinned v5_6_ru speakers while
+  preserving per-utterance streaming snapshots and bounded synthesis.
+
 ## [0.3.3] - 2026-10-17
 
 ### Changed

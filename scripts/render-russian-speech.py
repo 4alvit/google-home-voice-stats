@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render an additive Piper HTTPS/HA Wyoming deployment without credentials."""
+"""Render a local Russian HTTPS/HA Wyoming deployment without credentials."""
 import argparse
 import json
 import re
@@ -9,7 +9,7 @@ parser.add_argument('--namespace', default='igw-speech')
 parser.add_argument('--name', default='russian-speech')
 parser.add_argument('--node', required=True)
 parser.add_argument('--image', required=True)
-parser.add_argument('--voice', choices=('piper-ru-denis', 'piper-ru-irina'), default='piper-ru-denis')
+parser.add_argument('--voice', choices=('piper-ru-denis', 'piper-ru-irina', 'silero-ru-baya', 'silero-ru-kseniya', 'silero-ru-xenia', 'silero-ru-aidar', 'silero-ru-eugene'), default='piper-ru-denis')
 args = parser.parse_args()
 for value in (args.namespace, args.name, args.node):
     if not re.fullmatch(r'[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?', value):
@@ -20,6 +20,7 @@ labels = {'app.kubernetes.io/name': args.name}
 security = {'allowPrivilegeEscalation': False, 'readOnlyRootFilesystem': True, 'capabilities': {'drop': ['ALL']}}
 token = {'name': 'token', 'mountPath': '/run/speech', 'readOnly': True}
 env = [{'name': 'KITTEN_TOKEN_FILE', 'value': '/run/speech/token'},
+       {'name': 'RUSSIAN_TTS_BACKEND', 'value': 'silero' if args.voice.startswith('silero-ru-') else 'piper'},
        {'name': 'RUSSIAN_SPEECH_VOICE', 'value': args.voice}]
 tts = {'name': 'tts', 'image': args.image, 'securityContext': security,
        'env': env + [{'name': 'KITTEN_BIND_HOST', 'value': '0.0.0.0'},
@@ -56,4 +57,13 @@ service = {'apiVersion': 'v1', 'kind': 'Service', 'metadata': metadata,
            'spec': {'type': 'ClusterIP', 'selector': labels,
                     'ports': [{'name': 'wyoming', 'port': 10601, 'targetPort': 10601},
                               {'name': 'https', 'port': 8093, 'targetPort': 8093}]}}
-print(json.dumps({'apiVersion': 'v1', 'kind': 'List', 'items': [deployment, service]}, indent=2))
+items = [deployment, service]
+if args.voice.startswith('silero-ru-'):
+    tts['env'].append({'name': 'RUSSIAN_SPEECH_SETTINGS_FILE', 'value': '/state/settings.json'})
+    tts['volumeMounts'].append({'name': 'settings', 'mountPath': '/state'})
+    deployment['spec']['template']['spec']['volumes'].append({
+        'name': 'settings', 'persistentVolumeClaim': {'claimName': args.name + '-settings'}})
+    items.insert(0, {'apiVersion': 'v1', 'kind': 'PersistentVolumeClaim',
+        'metadata': {'name': args.name + '-settings', 'namespace': args.namespace},
+        'spec': {'accessModes': ['ReadWriteOnce'], 'resources': {'requests': {'storage': '64Mi'}}}})
+print(json.dumps({'apiVersion': 'v1', 'kind': 'List', 'items': items}, indent=2))
