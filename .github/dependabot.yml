@@ -1,6 +1,9 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
+    # Update fuzz together with toolkit-ref and the release policy.
+    ignore:
+      - dependency-name: "victron-venus/venus-os-ci-toolkit/.github/workflows/fuzz.yml"
     directory: /
     schedule:
       interval: daily
