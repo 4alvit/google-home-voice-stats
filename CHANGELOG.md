@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.5]
+
+### Security
+
+- Update Pillow to 13.0.0 for the optional Cast runtime and its tests.
+- Refresh certifi trust bundles to 2026.10.19 in the Cast, Piper and Russian Kitten environments.
+- Update affected optional speech environment locks to filelock 4.2.1 and Brotli 1.2.1, and setuptools build dependencies to 84.1.0.
+
+### Upgrade
+
+Update through the existing package or container procedure and retain local configuration and voice models. Optional voice providers still require their documented platform and model setup. Publication does not deploy services or change installed models.
+
 ## [0.3.4] - 2026-10-18
 
 ### Changed

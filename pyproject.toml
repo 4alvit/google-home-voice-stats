@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "igw-google-voice"
-version = "0.3.4"
+version = "0.3.5"
 description = "Read-only IGW energy reports for Google Nest, with standalone Cast and optional HA triggers"
 requires-python = ">=3.11"
 dependencies = ["cryptography==50.0.2; sys_platform != 'darwin' or platform_machine != 'x86_64'"]
 
 [project.optional-dependencies]
-test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==12.3.0", "PyChromecast==14.0.10", "wyoming==1.10.2"]
-cast = ["PyChromecast==14.0.10", "Pillow==12.3.0"]
+test = ["Jinja2==3.1.6", "PyYAML==6.0.3", "Pillow==13.0.0", "PyChromecast==14.0.10", "wyoming==1.10.2"]
+cast = ["PyChromecast==14.0.10", "Pillow==13.0.0"]
 piper = ["piper-tts==1.8.0"]
 russian-speech = ["wyoming==1.10.2"]
 
