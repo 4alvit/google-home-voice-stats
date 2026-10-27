@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.6] - Development line
+
+### Changed
+
+- Refresh the optional Cast container base from its previous pinned Python 3.14 Debian Bookworm image digest to the reviewed current digest.
+- Preserve synchronized source/package versions and the required build, dependency and security checks.
+
+### Upgrade
+
+Application APIs and voice settings are unchanged. Rebuild the optional Cast runtime with the documented procedure; preserve configuration, downloaded voice models and the previous accepted image for rollback. This source release does not deploy a container or test physical speech hardware.
+
+### Security
+
+No new application security fix is claimed. Required dependency checks and source-bound RC qualification remain enabled; deployment acceptance is separate.
+
 ## [0.3.5]
 
 ### Security
