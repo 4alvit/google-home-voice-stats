@@ -28,7 +28,7 @@ tts = {'name': 'tts', 'image': args.image, 'securityContext': security,
                      {'name': 'KITTEN_TLS_CERT_FILE', 'value': '/run/tls/tls.crt'},
                      {'name': 'KITTEN_TLS_KEY_FILE', 'value': '/run/tls/tls.key'},
                      {'name': 'KITTEN_THREADS', 'value': '2'}],
-       'resources': {'requests': {'cpu': '250m', 'memory': '256Mi'}, 'limits': {'cpu': '2', 'memory': '1Gi'}},
+       'resources': {'requests': {'cpu': '125m', 'memory': '256Mi'}, 'limits': {'cpu': '2', 'memory': '1Gi'}},
        'volumeMounts': [token, {'name': 'tls', 'mountPath': '/run/tls', 'readOnly': True},
                        {'name': 'tmp', 'mountPath': '/tmp'}],
        'startupProbe': {'httpGet': {'scheme': 'HTTPS', 'port': 8093, 'path': '/healthz'}, 'periodSeconds': 5, 'failureThreshold': 40},
@@ -38,7 +38,7 @@ wyoming = {'name': 'wyoming', 'image': args.image, 'command': ['python', '-m', '
            'env': env + [{'name': 'RUSSIAN_SPEECH_ENDPOINT', 'value': 'https://127.0.0.1:8093/v1/speech'},
                          {'name': 'KITTEN_CA_FILE', 'value': '/run/ca/ca.crt'},
                          {'name': 'WYOMING_HOST', 'value': '0.0.0.0'}],
-           'resources': {'requests': {'cpu': '25m', 'memory': '32Mi'}, 'limits': {'cpu': '250m', 'memory': '128Mi'}},
+           'resources': {'requests': {'cpu': '13m', 'memory': '32Mi'}, 'limits': {'cpu': '250m', 'memory': '128Mi'}},
            'volumeMounts': [token, {'name': 'ca', 'mountPath': '/run/ca', 'readOnly': True}],
            'readinessProbe': {'tcpSocket': {'port': 10601}, 'periodSeconds': 10}}
 metadata = {'name': args.name, 'namespace': args.namespace}
