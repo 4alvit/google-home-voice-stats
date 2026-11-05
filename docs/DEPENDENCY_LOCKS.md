@@ -24,3 +24,10 @@ that digest. CI tests both `CAST_INSTALL_PIPER=false` and `true`, checks install
 dependency consistency and imports the runtime without contacting Cast devices.
 The Python locks do not freeze Debian apt repositories; OS packages still
 receive the base distribution's updates when rebuilding.
+
+Renovate uses native `pip-compile` to update the recorded source and supported
+compiled locks together. Binary-only targets include
+`.github/requirements-wheels-only.in`, preserving their previous
+`--only-binary :all:` policy without changing other compile flags. The macOS
+platform lock, Silero multi-index/platform lock, and stdin-only package lock
+retain their explicit source procedures.

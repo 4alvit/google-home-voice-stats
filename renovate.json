@@ -8,26 +8,51 @@
     "custom.regex",
     "custom.jsonata",
     "dockerfile",
-    "pep621",
-    "pip_requirements"
+    "pip_requirements",
+    "pip-compile"
   ],
   "pip_requirements": {
     "managerFilePatterns": [
       "/(^|/)requirements[^/]*\\.(txt|pip)$/"
+    ],
+    "ignorePaths": [
+      "**/vendor/**",
+      "**/node_modules/**",
+      "**/fixtures/**",
+      ".github/requirements-security.txt",
+      "requirements-kitten-macos-intel.lock",
+      "requirements-kitten-package.lock",
+      "requirements-russian-silero.lock",
+      ".github/requirements-build.txt",
+      "requirements-cast.lock",
+      "requirements-kitten.lock",
+      "requirements-piper.lock",
+      "requirements-russian-kitten.lock",
+      "requirements-russian-piper.lock",
+      "requirements-test.lock",
+      "requirements-tls.lock",
+      ".github/requirements-build.in",
+      ".github/requirements-wheels-only.in",
+      "pyproject.toml",
+      "requirements-kitten.in",
+      "requirements-russian-kitten.in",
+      "requirements-russian-piper.in",
+      "requirements-tls.in"
     ]
   },
   "ignorePaths": [
     "**/vendor/**",
     "**/node_modules/**",
     "**/fixtures/**",
-    ".github/requirements-build.txt",
-    ".github/requirements-security.txt"
+    ".github/requirements-security.txt",
+    "requirements-kitten-macos-intel.lock",
+    "requirements-kitten-package.lock",
+    "requirements-russian-silero.lock"
   ],
   "packageRules": [
     {
       "description": "Generated locks with unsupported compile flags or export headers are regenerated through their existing source workflow.",
       "matchFileNames": [
-        ".github/requirements-build.txt",
         ".github/requirements-security.txt"
       ],
       "enabled": false,
@@ -46,5 +71,17 @@
       ],
       "allowedVersions": "<3.15"
     }
-  ]
+  ],
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^\\.github/requirements\\-build\\.txt$/",
+      "/^requirements\\-cast\\.lock$/",
+      "/^requirements\\-kitten\\.lock$/",
+      "/^requirements\\-piper\\.lock$/",
+      "/^requirements\\-russian\\-kitten\\.lock$/",
+      "/^requirements\\-russian\\-piper\\.lock$/",
+      "/^requirements\\-test\\.lock$/",
+      "/^requirements\\-tls\\.lock$/"
+    ]
+  }
 }
