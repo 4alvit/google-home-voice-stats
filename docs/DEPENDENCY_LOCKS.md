@@ -31,3 +31,8 @@ compiled locks together. Binary-only targets include
 `--only-binary :all:` policy without changing other compile flags. The macOS
 platform lock, Silero multi-index/platform lock, and stdin-only package lock
 retain their explicit source procedures.
+
+The cast, Piper and test project locks use `requirements-tls.lock` as a
+constraint. This keeps shared cryptography dependencies consistent when CI
+installs the test and TLS locks together. Native updates regenerate the TLS
+lock before those dependent project outputs.

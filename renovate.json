@@ -19,10 +19,11 @@
       "**/vendor/**",
       "**/node_modules/**",
       "**/fixtures/**",
-      ".github/requirements-security.txt",
       "requirements-kitten-macos-intel.lock",
       "requirements-kitten-package.lock",
       "requirements-russian-silero.lock",
+      "requirements-kitten-macos-intel.in",
+      "requirements-russian-silero.in",
       ".github/requirements-build.txt",
       "requirements-cast.lock",
       "requirements-kitten.lock",
@@ -31,7 +32,9 @@
       "requirements-russian-piper.lock",
       "requirements-test.lock",
       "requirements-tls.lock",
+      ".github/requirements-security.txt",
       ".github/requirements-build.in",
+      ".github/requirements-security.in",
       ".github/requirements-wheels-only.in",
       "pyproject.toml",
       "requirements-kitten.in",
@@ -44,22 +47,13 @@
     "**/vendor/**",
     "**/node_modules/**",
     "**/fixtures/**",
-    ".github/requirements-security.txt",
     "requirements-kitten-macos-intel.lock",
     "requirements-kitten-package.lock",
-    "requirements-russian-silero.lock"
+    "requirements-russian-silero.lock",
+    "requirements-kitten-macos-intel.in",
+    "requirements-russian-silero.in"
   ],
   "packageRules": [
-    {
-      "description": "Generated locks with unsupported compile flags or export headers are regenerated through their existing source workflow.",
-      "matchFileNames": [
-        ".github/requirements-security.txt"
-      ],
-      "enabled": false,
-      "matchManagers": [
-        "pip_requirements"
-      ]
-    },
     {
       "description": "Piper ONNX Runtime has no Python 3.15 wheels; preserve the existing Docker version hold.",
       "matchManagers": [
@@ -81,7 +75,8 @@
       "/^requirements\\-russian\\-kitten\\.lock$/",
       "/^requirements\\-russian\\-piper\\.lock$/",
       "/^requirements\\-test\\.lock$/",
-      "/^requirements\\-tls\\.lock$/"
+      "/^requirements\\-tls\\.lock$/",
+      "/^\\.github/requirements\\-security\\.txt$/"
     ]
   }
 }
