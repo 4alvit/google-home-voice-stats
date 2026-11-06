@@ -358,4 +358,4 @@ stream was retrieved without errors. The delay before the first sentence is
 still model-dependent. These are server-side measurements, not acoustic
 microphone-to-speaker timings.
 
-The Cast/Piper container remains on Python 3.14: its pinned ONNX Runtime has no Python 3.15 wheel. Dependabot continues 3.14 updates. Before lifting the major interpreter bound, validate both `CAST_INSTALL_PIPER` image variants with their hash-locked binary dependencies.
+The Cast/Piper container remains on Python 3.14: its pinned ONNX Runtime has no Python 3.15 wheel. Renovate continues 3.14 updates. Before lifting the major interpreter bound, validate both `CAST_INSTALL_PIPER` image variants with their hash-locked binary dependencies.
