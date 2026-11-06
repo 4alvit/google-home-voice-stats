@@ -53,7 +53,13 @@ uv pip compile --no-deps --generate-hashes --python-version 3.11 --no-build --ou
 ## Source distribution qualification boundary
 
 The isolated Russian Kitten source and lock remain a reviewed source update unit. The selected `antlr4-python3-runtime==4.9.3` has only a source distribution. Resolving this closure with source builds disabled downgrades Hydra and OmegaConf; those downgrades are not accepted. Update `requirements-russian-kitten.in` and regenerate its existing header command in the qualified development environment, then run the Russian Kitten checks. Other native and guarded locks remain automated.
-Security fixes for this held source/output unit use the same manual procedure.
+For a transitive security fix, append `--upgrade-package <name>` to that
+compile command, replacing `<name>` with the affected package; otherwise uv
+can retain the old lock pin. Check that every affected Python/platform branch
+selects a version in the advisory's fixed range. If direct or parent constraints
+exclude the fix, review a compatible source-constraint change together with the
+whole held unit; do not treat a successful resolver exit as remediation.
+Security fixes for this held source/output unit use this manual procedure.
 Security updates for other supported units remain automated.
 
 The Russian Kitten and TLS locks are installed together. The unit suite checks
