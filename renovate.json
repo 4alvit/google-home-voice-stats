@@ -155,6 +155,23 @@
         "onnxruntime"
       ],
       "allowedVersions": "==1.19.2"
+    },
+    {
+      "description": "These optional TTS lock generators explicitly target Python 3.11; select releases whose Python metadata supports that interpreter.",
+      "matchManagers": [
+        "pip-compile",
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-kitten.in",
+        "requirements-russian-piper.in",
+        "requirements-kitten-macos-intel.in",
+        "requirements-russian-silero.in"
+      ],
+      "constraints": {
+        "python": "3.11"
+      },
+      "constraintsFiltering": "strict"
     }
   ],
   "pip-compile": {
