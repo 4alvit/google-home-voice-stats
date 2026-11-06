@@ -49,3 +49,18 @@ uv pip compile --generate-hashes --python-version 3.11 --python-platform x86_64-
 uv pip compile requirements-russian-silero.in --generate-hashes --emit-index-url --index-strategy unsafe-best-match --python-version 3.11 --python-platform x86_64-manylinux_2_28 --no-build --output-file requirements-russian-silero.lock
 uv pip compile --no-deps --generate-hashes --python-version 3.11 --no-build --output-file requirements-kitten-package.lock requirements-kitten-package.in
 ```
+
+## Source distribution qualification boundary
+
+The isolated Russian Kitten source and lock remain a reviewed source update unit. The selected `antlr4-python3-runtime==4.9.3` has only a source distribution. Resolving this closure with source builds disabled downgrades Hydra and OmegaConf; those downgrades are not accepted. Update `requirements-russian-kitten.in` and regenerate its existing header command in the qualified development environment, then run the Russian Kitten checks. Other native and guarded locks remain automated.
+Security fixes for this held source/output unit use the same manual procedure.
+Security updates for other supported units remain automated.
+
+The Russian Kitten and TLS locks are installed together. The unit suite checks
+shared exact pins (currently `cffi` and `pycparser`) across the platform-marker
+classes, including Intel macOS and PyPy exclusions. If a TLS update conflicts,
+manually regenerate and qualify the held Kitten lock with the updated TLS lock
+before merging; keep their overlapping pins compatible. Run
+`python3 -m unittest discover -s tests -p test_lock_compatibility.py -v` to verify
+the pair, then perform the existing isolated Kitten installation and inference
+qualification. This applies to ordinary and security updates.

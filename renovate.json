@@ -52,7 +52,9 @@
     "**/fixtures/**",
     "requirements-kitten-macos-intel.lock",
     "requirements-kitten-package.lock",
-    "requirements-russian-silero.lock"
+    "requirements-russian-silero.lock",
+    "requirements-russian-kitten.in",
+    "requirements-russian-kitten.lock"
   ],
   "packageRules": [
     {
@@ -161,7 +163,6 @@
       "/^requirements\\-cast\\.lock$/",
       "/^requirements\\-kitten\\.lock$/",
       "/^requirements\\-piper\\.lock$/",
-      "/^requirements\\-russian\\-kitten\\.lock$/",
       "/^requirements\\-russian\\-piper\\.lock$/",
       "/^requirements\\-test\\.lock$/",
       "/^requirements\\-tls\\.lock$/",
