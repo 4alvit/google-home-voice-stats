@@ -1,2 +1,2 @@
 # Install only the reviewed upstream package; ONNX dependencies are qualified separately.
-kittenml==0.9.4
+kittenml==0.9.7
