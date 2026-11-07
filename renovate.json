@@ -1,6 +1,190 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "local>victron-venus/venus-os-ci-toolkit:renovate-ci"
-  ]
+    "local>victron-venus/venus-os-ci-toolkit:renovate-fleet"
+  ],
+  "enabledManagers": [
+    "github-actions",
+    "custom.regex",
+    "custom.jsonata",
+    "dockerfile",
+    "pip_requirements",
+    "pip-compile"
+  ],
+  "pip_requirements": {
+    "managerFilePatterns": [
+      "/(^|/)requirements[^/]*\\.(txt|pip)$/",
+      "/^requirements\\-kitten\\-macos\\-intel\\.in$/",
+      "/^requirements\\-russian\\-silero\\.in$/",
+      "/^requirements\\-kitten\\-package\\.in$/"
+    ],
+    "ignorePaths": [
+      "**/vendor/**",
+      "**/node_modules/**",
+      "**/fixtures/**",
+      "requirements-kitten-macos-intel.lock",
+      "requirements-kitten-package.lock",
+      "requirements-russian-silero.lock",
+      ".github/requirements-build.txt",
+      "requirements-cast.lock",
+      "requirements-kitten.lock",
+      "requirements-piper.lock",
+      "requirements-russian-kitten.lock",
+      "requirements-russian-piper.lock",
+      "requirements-test.lock",
+      "requirements-tls.lock",
+      ".github/requirements-security.txt",
+      ".github/requirements-fuzz.txt",
+      ".github/requirements-build.in",
+      ".github/requirements-fuzz.in",
+      ".github/requirements-security.in",
+      ".github/requirements-wheels-only.in",
+      "pyproject.toml",
+      "requirements-kitten.in",
+      "requirements-russian-kitten.in",
+      "requirements-russian-piper.in",
+      "requirements-tls.in"
+    ]
+  },
+  "ignorePaths": [
+    "**/vendor/**",
+    "**/node_modules/**",
+    "**/fixtures/**",
+    "requirements-kitten-macos-intel.lock",
+    "requirements-kitten-package.lock",
+    "requirements-russian-silero.lock",
+    "requirements-russian-kitten.in",
+    "requirements-russian-kitten.lock"
+  ],
+  "packageRules": [
+    {
+      "description": "Piper ONNX Runtime has no Python 3.15 wheels; preserve the existing Docker version hold.",
+      "matchManagers": [
+        "dockerfile",
+        "docker-compose"
+      ],
+      "matchPackageNames": [
+        "python"
+      ],
+      "allowedVersions": "<3.15"
+    },
+    {
+      "description": "Regenerate this platform-qualified dependency lock from its exact requirements input without executing build hooks.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-kitten-macos-intel.in"
+      ],
+      "constraints": {
+        "uv": "0.13.4"
+      },
+      "postUpgradeTasks": {
+        "commands": [
+          "uv pip compile --generate-hashes --python-version 3.11 --python-platform x86_64-apple-darwin --no-build --output-file requirements-kitten-macos-intel.lock requirements-kitten-macos-intel.in"
+        ],
+        "fileFilters": [
+          "requirements-kitten-macos-intel.lock"
+        ],
+        "executionMode": "update",
+        "workingDirTemplate": ".",
+        "installTools": {
+          "uv": {}
+        }
+      }
+    },
+    {
+      "description": "Regenerate this platform-qualified dependency lock from its exact requirements input without executing build hooks.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-russian-silero.in"
+      ],
+      "constraints": {
+        "uv": "0.13.4"
+      },
+      "postUpgradeTasks": {
+        "commands": [
+          "uv pip compile requirements-russian-silero.in --generate-hashes --emit-index-url --index-strategy unsafe-best-match --python-version 3.11 --python-platform x86_64-manylinux_2_28 --no-build --output-file requirements-russian-silero.lock"
+        ],
+        "fileFilters": [
+          "requirements-russian-silero.lock"
+        ],
+        "executionMode": "update",
+        "workingDirTemplate": ".",
+        "installTools": {
+          "uv": {}
+        }
+      }
+    },
+    {
+      "description": "Regenerate this platform-qualified dependency lock from its exact requirements input without executing build hooks.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-kitten-package.in"
+      ],
+      "constraints": {
+        "uv": "0.13.4"
+      },
+      "postUpgradeTasks": {
+        "commands": [
+          "uv pip compile --no-deps --generate-hashes --python-version 3.11 --no-build --output-file requirements-kitten-package.lock requirements-kitten-package.in"
+        ],
+        "fileFilters": [
+          "requirements-kitten-package.lock"
+        ],
+        "executionMode": "update",
+        "workingDirTemplate": ".",
+        "installTools": {
+          "uv": {}
+        }
+      }
+    },
+    {
+      "description": "macOS 12 Intel requires the reviewed ONNX Runtime 1.19.2 wheel; later wheels require macOS 13.",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-kitten-macos-intel.in"
+      ],
+      "matchPackageNames": [
+        "onnxruntime"
+      ],
+      "allowedVersions": "==1.19.2"
+    },
+    {
+      "description": "These optional TTS lock generators explicitly target Python 3.11; select releases whose Python metadata supports that interpreter.",
+      "matchManagers": [
+        "pip-compile",
+        "pip_requirements"
+      ],
+      "matchFileNames": [
+        "requirements-kitten.in",
+        "requirements-russian-piper.in",
+        "requirements-kitten-macos-intel.in",
+        "requirements-russian-silero.in"
+      ],
+      "constraints": {
+        "python": "3.11"
+      },
+      "constraintsFiltering": "strict"
+    }
+  ],
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^\\.github/requirements\\-build\\.txt$/",
+      "/^requirements\\-cast\\.lock$/",
+      "/^requirements\\-kitten\\.lock$/",
+      "/^requirements\\-piper\\.lock$/",
+      "/^requirements\\-russian\\-piper\\.lock$/",
+      "/^requirements\\-test\\.lock$/",
+      "/^requirements\\-tls\\.lock$/",
+      "/^\\.github/requirements\\-security\\.txt$/",
+      "/^\\.github/requirements\\-fuzz\\.txt$/"
+    ]
+  }
 }
