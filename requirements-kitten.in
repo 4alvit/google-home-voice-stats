@@ -1,5 +1,5 @@
 # The ONNX backend only. KittenTTS 2 / Torch / CUDA are intentionally excluded.
-onnxruntime==1.31.1
+onnxruntime==1.32.0
 espeakng-loader==0.2.4
 phonemizer==3.6.0
 soundfile==0.14.0
