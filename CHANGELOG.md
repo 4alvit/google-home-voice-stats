@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.7] - Unreleased
+
+### Changed
+
+- keep local instruction files out of git.
+- add a navigation index for docs/.
+- verify the current default branch before reviewed merges.
+- reevaluate reviewed dependency merges after CI (#91).
+- use the shared safe scope regeneration guide (#89).
+- skip heavy qualification for ordinary documentation (#88).
+- Complete dependency update migration to Renovate (#87).
+- Complete dependency update migration to Renovate (#86).
+- Guard dependency updates from source builds (#85).
+- Complete dependency update migration to Renovate (#84).
+
+### Upgrade
+
+Application APIs and voice settings are unchanged. Rebuild the optional Cast runtime with the documented procedure; preserve configuration, downloaded voice models and the previous accepted image for rollback. This source release does not deploy a container or test physical speech hardware.
+
+### Security
+
+No new application security fix is claimed. Required dependency checks and source-bound RC qualification remain enabled; deployment acceptance is separate.
+
 ## [0.3.6] - Development line
 
 ### Changed
